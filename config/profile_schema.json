@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AntiDetectBrowser profile",
+  "type": "object",
+  "required": ["id", "name", "userAgent", "hardware"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "userAgent": { "type": "string", "minLength": 1 },
+    "hardware": {
+      "type": "object",
+      "required": ["cpuCores", "memoryGb", "screenWidth", "screenHeight", "masterSeedHex"],
+      "properties": {
+        "cpuCores": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "memoryGb": { "type": "integer", "minimum": 1, "maximum": 1024 },
+        "screenWidth": { "type": "integer", "minimum": 1 },
+        "screenHeight": { "type": "integer", "minimum": 1 },
+        "masterSeedHex": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" }
+      }
+    }
+  }
+}
+
