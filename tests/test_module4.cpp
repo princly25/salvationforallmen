@@ -1,10 +1,13 @@
 #include "core/ProfileInstance.hpp"
 #include "network/KillSwitchEngine.hpp"
 #include "network/NetworkMonitor.hpp"
+#include "network/NetworkStackPolicy.hpp"
 
 #include <QByteArray>
 #include <QCoreApplication>
+#include <QHttp2Configuration>
 #include <QSignalSpy>
+#include <QSslConfiguration>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
@@ -28,6 +31,7 @@ class Module4Test final : public QObject {
 
 private slots:
     void monitorDetectsProxyLossAndRecovery();
+    void networkRequestsUseChromiumAlignedPolicy();
     void killSwitchFreezesAndVerifiesProxyExit();
     void restorationFailsClosedOnMismatch();
 };
@@ -57,6 +61,22 @@ void Module4Test::monitorDetectsProxyLossAndRecovery()
     QCOMPARE(monitor.status(), NetworkStatus::Healthy);
     monitor.stopMonitoring();
     QVERIFY(!monitor.isMonitoring());
+}
+
+void Module4Test::networkRequestsUseChromiumAlignedPolicy()
+{
+    QNetworkRequest request(QUrl(QStringLiteral("https://example.test")));
+    NetworkStackPolicy::apply(request);
+
+    QVERIFY(request.attribute(QNetworkRequest::Http2AllowedAttribute).toBool());
+    const QHttp2Configuration http2 = request.http2Configuration();
+    QVERIFY(!http2.serverPushEnabled());
+    QVERIFY(http2.huffmanCompressionEnabled());
+    QCOMPARE(http2.streamReceiveWindowSize(), 6291456U);
+    QCOMPARE(http2.maxFrameSize(), 16384U);
+    const QList<QByteArray> protocols = request.sslConfiguration().allowedNextProtocols();
+    QCOMPARE(protocols.value(0), QByteArray(QSslConfiguration::ALPNProtocolHTTP2));
+    QCOMPARE(protocols.value(1), QByteArray(QSslConfiguration::NextProtocolHttp1_1));
 }
 
 void Module4Test::killSwitchFreezesAndVerifiesProxyExit()

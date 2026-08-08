@@ -122,16 +122,19 @@ void Module6Test::profileCardControlsLifecycle()
     auto* terminateButton = card->findChild<QPushButton*>(QStringLiteral("terminateProfile"));
     auto* launchButton = card->findChild<QPushButton*>(QStringLiteral("launchProfile"));
     auto* syncButton = card->findChild<QPushButton*>(QStringLiteral("syncProxy"));
+    auto* inspectButton = card->findChild<QPushButton*>(QStringLiteral("inspectCookies"));
     auto* exportButton = card->findChild<QPushButton*>(QStringLiteral("exportCookies"));
     auto* deleteButton = card->findChild<QPushButton*>(QStringLiteral("deleteProfile"));
     QVERIFY(freezeButton != nullptr);
     QVERIFY(terminateButton != nullptr);
     QVERIFY(launchButton != nullptr);
     QVERIFY(syncButton != nullptr);
+    QVERIFY(inspectButton != nullptr);
     QVERIFY(exportButton != nullptr);
     QVERIFY(deleteButton != nullptr);
     QCOMPARE(launchButton->text(), QStringLiteral("Launch Profile"));
     QCOMPARE(syncButton->text(), QStringLiteral("Sync Proxy"));
+    QCOMPARE(inspectButton->text(), QStringLiteral("Inspect Cookies"));
     QCOMPARE(exportButton->text(), QStringLiteral("Export Cookies"));
     QCOMPARE(deleteButton->text(), QStringLiteral("Delete"));
 

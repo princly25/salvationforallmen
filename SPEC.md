@@ -569,3 +569,8 @@ Feed these commands to Codex CLI sequentially:
 - **Runtime JS Overrides:** Dynamically inject runtime JavaScript overrides for `Intl.DateTimeFormat`, `Date.prototype.getTimezoneOffset`, `navigator.language`, and `navigator.languages` to maintain network-to-browser environmental consistency.
 - **Header Synchronization:** Automatically set the `QWebEngineProfile` `Accept-Language` header to align with the proxy's regional language code.
 - **WebRTC Enforcement:** Configure `QWebEngineSettings::WebRTCPublicInterfacesOnly` to ensure WebRTC candidate gathering is restricted strictly to proxied interfaces.
+
+### Module 4.4: TLS & HTTP/2 Network Stack Alignment
+- **TLS JA3/JA4 Normalization:** Configure `QNetworkAccessManager` and SSL sockets to negotiate TLS ciphers, extensions, and elliptic curves in the exact order emitted by modern Chromium releases.
+- **HTTP/2 Frame Synchronization:** Match Chromium's native HTTP/2 SETTINGS frames (header table size, initial window size, max concurrent streams) to prevent TLS/H2 fingerprint mismatch flagging.
+- **Client Hints Parity:** Enforce synchronous delivery of `Sec-CH-UA`, `Sec-CH-UA-Mobile`, and `Sec-CH-UA-Platform` headers on all initial navigation requests to Google services.

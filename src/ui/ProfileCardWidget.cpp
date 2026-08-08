@@ -84,6 +84,8 @@ ProfileCardWidget::ProfileCardWidget(ProfileInstance* profile, QWidget* parent)
     m_launchButton->setObjectName(QStringLiteral("launchProfile"));
     auto* syncButton = new QPushButton(QStringLiteral("Sync Proxy"), this);
     syncButton->setObjectName(QStringLiteral("syncProxy"));
+    auto* inspectCookiesButton = new QPushButton(QStringLiteral("Inspect Cookies"), this);
+    inspectCookiesButton->setObjectName(QStringLiteral("inspectCookies"));
     auto* cookiesButton = new QPushButton(QStringLiteral("Export Cookies"), this);
     cookiesButton->setObjectName(QStringLiteral("exportCookies"));
     auto* deleteButton = new QPushButton(QStringLiteral("Delete"), this);
@@ -95,10 +97,11 @@ ProfileCardWidget::ProfileCardWidget(ProfileInstance* profile, QWidget* parent)
 
     actionLayout->addWidget(m_launchButton, 0, 0);
     actionLayout->addWidget(syncButton, 0, 1);
-    actionLayout->addWidget(cookiesButton, 1, 0);
-    actionLayout->addWidget(deleteButton, 1, 1);
-    actionLayout->addWidget(m_freezeButton, 2, 0);
-    actionLayout->addWidget(m_terminateButton, 2, 1);
+    actionLayout->addWidget(inspectCookiesButton, 1, 0);
+    actionLayout->addWidget(cookiesButton, 1, 1);
+    actionLayout->addWidget(deleteButton, 2, 0);
+    actionLayout->addWidget(m_freezeButton, 2, 1);
+    actionLayout->addWidget(m_terminateButton, 3, 0, 1, 2);
     layout->addLayout(actionLayout);
 
     connect(m_launchButton, &QPushButton::clicked, this, [this] {
@@ -110,6 +113,9 @@ ProfileCardWidget::ProfileCardWidget(ProfileInstance* profile, QWidget* parent)
     });
     connect(syncButton, &QPushButton::clicked, this, [this] {
         emit geoSyncRequested(m_profile->config().id);
+    });
+    connect(inspectCookiesButton, &QPushButton::clicked, this, [this] {
+        emit cookieInspectorRequested(m_profile->config().id);
     });
     connect(cookiesButton, &QPushButton::clicked, this, [this] {
         emit exportCookiesRequested(m_profile->config().id);

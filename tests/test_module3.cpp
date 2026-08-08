@@ -49,6 +49,13 @@ HTMLCanvasElement.prototype.toDataURL = function() { return this.context.lastPut
 function AudioBuffer() { this.samples = [0.25, 0.5, 0.75]; }
 AudioBuffer.prototype.getChannelData = function() { return this.samples; };
 var document = { fonts: { check: function() { return true; } } };
+var Intl = { DateTimeFormat: function(locales, options) {
+  var selected = Array.isArray(locales) ? locales[0] : (locales || 'en-US');
+  var timezone = options && options.timeZone ? options.timeZone : 'UTC';
+  return { resolvedOptions: function() {
+    return { locale: selected, timeZone: timezone };
+  }};
+} };
 )JS");
 }
 }
@@ -108,6 +115,9 @@ void Module3Test::mockBrowserObservesSpoofedSurfaces()
     QVERIFY(engine.evaluate(QStringLiteral("navigator.webdriver === undefined")).toBool());
     QCOMPARE(engine.evaluate(QStringLiteral("navigator.languages.join(',')")).toString(),
              QStringLiteral("de-DE,de,en"));
+    QCOMPARE(engine.evaluate(QStringLiteral("Intl.DateTimeFormat().resolvedOptions().locale"))
+                 .toString(),
+             QStringLiteral("de-DE"));
     QCOMPARE(engine.evaluate(QStringLiteral("screen.width + 'x' + screen.height")).toString(),
              QStringLiteral("2560x1440"));
     QCOMPARE(engine.evaluate(QStringLiteral("(new WebGLRenderingContext()).getParameter(0x9245)"))

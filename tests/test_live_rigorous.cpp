@@ -414,6 +414,8 @@ void LiveRigorousTest::simulatedRealHttpProxyHandshake()
     QTemporaryDir storageRoot;
     ProfileConfig config = liveConfig(QStringLiteral("http-proxy-live"),
                                       std::string(64, '3'), proxyConfig);
+    config.userAgent = QStringLiteral(
+        "Mozilla/5.0 (X11; Linux x86_64) Chrome/126.0.0.0 Safari/537.36");
     config.expectedProxyIp = QStringLiteral("203.0.113.55");
     config.proxyVerificationUrl = QUrl(QStringLiteral("http://rigorous-probe.invalid/ip"));
     ProfileInstance profile(config, storageRoot.path());
@@ -438,6 +440,21 @@ void LiveRigorousTest::simulatedRealHttpProxyHandshake()
     const QString response = pageText(profile.view()->page());
     QVERIFY(response.contains(config.expectedProxyIp));
     QVERIFY(response.contains(QStringLiteral("mock-http-proxy")));
+
+    const QUrl googleNavigation(QStringLiteral("http://www.google.com/initial-navigation"));
+    QVERIFY(waitForLoad(profile.view()->page(), googleNavigation));
+    bool observedClientHints = false;
+    for (const HttpRequestRecord& request : proxy.requests()) {
+        if (!request.target.contains("www.google.com/initial-navigation")) {
+            continue;
+        }
+        observedClientHints = true;
+        QVERIFY(request.headers.value("sec-ch-ua").contains("Google Chrome"));
+        QVERIFY(request.headers.value("sec-ch-ua").contains("126"));
+        QCOMPARE(request.headers.value("sec-ch-ua-mobile"), QByteArray("?0"));
+        QCOMPARE(request.headers.value("sec-ch-ua-platform"), QByteArray("\"Linux\""));
+    }
+    QVERIFY(observedClientHints);
 }
 
 void LiveRigorousTest::dynamicKillSwitchFailsClosedWithoutNativeFallback()
@@ -539,6 +556,7 @@ void LiveRigorousTest::proxyTimezoneAndLocaleReachBrowserRuntime()
 
     const QVariant runtime = runJavaScript(profile.view()->page(), QStringLiteral(R"JS([
       Intl.DateTimeFormat().resolvedOptions().timeZone,
+      Intl.DateTimeFormat().resolvedOptions().locale,
       navigator.language,
       navigator.languages.join(','),
       new Date(0).getTimezoneOffset(),
@@ -549,12 +567,13 @@ void LiveRigorousTest::proxyTimezoneAndLocaleReachBrowserRuntime()
     ])JS"));
     QVERIFY(runtime.isValid());
     const QVariantList values = runtime.toList();
-    QCOMPARE(values.size(), 5);
+    QCOMPARE(values.size(), 6);
     QCOMPARE(values.at(0).toString(), config.timezone);
     QCOMPARE(values.at(1).toString(), QStringLiteral("de-DE"));
-    QCOMPARE(values.at(2).toString(), QStringLiteral("de-DE,de"));
-    QCOMPARE(values.at(3).toInt(), -config.timezoneOffsetMinutes);
-    QCOMPARE(values.at(4).toString(), QStringLiteral("02"));
+    QCOMPARE(values.at(2).toString(), QStringLiteral("de-DE"));
+    QCOMPARE(values.at(3).toString(), QStringLiteral("de-DE,de"));
+    QCOMPARE(values.at(4).toInt(), -config.timezoneOffsetMinutes);
+    QCOMPARE(values.at(5).toString(), QStringLiteral("02"));
 }
 
 int main(int argc, char* argv[])

@@ -52,6 +52,7 @@ add_library(adb_core STATIC
     src/hooks/MinHookManager.cpp
     src/network/NetworkMonitor.cpp
     src/network/KillSwitchEngine.cpp
+    src/network/NetworkStackPolicy.cpp
     src/network/ProxyFetcher.cpp
     src/ui/MainWindow.cpp
     src/ui/ProfileCardWidget.cpp
@@ -125,4 +126,12 @@ if(ADB_BUILD_TESTS)
     target_link_libraries(test_proxy_fetcher PRIVATE adb_core Qt6::Test)
     add_test(NAME proxy_provider_fetcher COMMAND test_proxy_fetcher)
     set_tests_properties(proxy_provider_fetcher PROPERTIES TIMEOUT 15)
+
+    add_executable(test_ui_interactive tests/test_ui_interactive.cpp)
+    target_link_libraries(test_ui_interactive PRIVATE adb_core Qt6::Test)
+    add_test(NAME test_ui_interactive COMMAND test_ui_interactive)
+    set_tests_properties(test_ui_interactive PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox --disable-gpu --single-process --no-zygote;QTWEBENGINE_DISABLE_SANDBOX=1"
+        TIMEOUT 60
+    )
 endif()

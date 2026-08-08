@@ -1,6 +1,7 @@
 #include "network/KillSwitchEngine.hpp"
 
 #include "core/ProfileInstance.hpp"
+#include "network/NetworkStackPolicy.hpp"
 
 #include <QHostAddress>
 #include <QJsonDocument>
@@ -96,6 +97,7 @@ void KillSwitchEngine::handleRestoration()
     }
 
     QNetworkRequest request(m_verificationEndpoint);
+    NetworkStackPolicy::apply(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setTransferTimeout(1500);

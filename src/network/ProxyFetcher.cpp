@@ -1,4 +1,5 @@
 #include "network/ProxyFetcher.hpp"
+#include "network/NetworkStackPolicy.hpp"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -175,6 +176,7 @@ void ProxyProviderManager::fetchProxies(const QUrl& apiUrl, const QString& apiTo
 
     m_pendingFormat = inferFormat(apiUrl, format);
     QNetworkRequest request(apiUrl);
+    NetworkStackPolicy::apply(request);
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("AntiDetectBrowser/0.1 ProxyProviderManager"));
     request.setRawHeader("Accept", "application/json");

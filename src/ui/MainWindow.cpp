@@ -27,6 +27,7 @@
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QSaveFile>
+#include <QSettings>
 #include <QScrollArea>
 #include <QSplitter>
 #include <QSpinBox>
@@ -200,38 +201,6 @@ QWidget* MainWindow::buildProxyPage()
     description->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
     layout->addWidget(description);
 
-    auto* provider = new QGroupBox(QStringLiteral("Provider API"), page);
-    auto* providerForm = new QFormLayout(provider);
-    m_proxyProviderFormat = new QComboBox(provider);
-    m_proxyProviderFormat->setObjectName(QStringLiteral("proxyProviderFormat"));
-    m_proxyProviderFormat->addItem(QStringLiteral("Auto-detect"),
-                                   static_cast<int>(ProxyProviderManager::ProviderFormat::AutoDetect));
-    m_proxyProviderFormat->addItem(QStringLiteral("Webshare"),
-                                   static_cast<int>(ProxyProviderManager::ProviderFormat::Webshare));
-    m_proxyProviderFormat->addItem(QStringLiteral("IPRoyal"),
-                                   static_cast<int>(ProxyProviderManager::ProviderFormat::IPRoyal));
-    m_proxyProviderFormat->addItem(QStringLiteral("Custom JSON API"),
-                                   static_cast<int>(ProxyProviderManager::ProviderFormat::Custom));
-    m_proxyProviderApiUrl = new QLineEdit(provider);
-    m_proxyProviderApiUrl->setObjectName(QStringLiteral("proxyProviderApiUrl"));
-    m_proxyProviderApiUrl->setPlaceholderText(
-        QStringLiteral("https://proxy-provider.example/api/proxies"));
-    m_proxyProviderToken = new QLineEdit(provider);
-    m_proxyProviderToken->setObjectName(QStringLiteral("proxyProviderToken"));
-    m_proxyProviderToken->setEchoMode(QLineEdit::Password);
-    m_proxyProviderToken->setPlaceholderText(QStringLiteral("API key or token"));
-    m_fetchProxiesButton = new QPushButton(QStringLiteral("Fetch and Test Proxies"), provider);
-    m_fetchProxiesButton->setObjectName(QStringLiteral("fetchProxies"));
-    m_proxyFetcherStatus = new QLabel(QStringLiteral("Ready to connect."), provider);
-    m_proxyFetcherStatus->setObjectName(QStringLiteral("proxyFetcherStatus"));
-    m_proxyFetcherStatus->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
-    providerForm->addRow(QStringLiteral("Provider"), m_proxyProviderFormat);
-    providerForm->addRow(QStringLiteral("API URL"), m_proxyProviderApiUrl);
-    providerForm->addRow(QStringLiteral("Token"), m_proxyProviderToken);
-    providerForm->addRow(m_fetchProxiesButton);
-    providerForm->addRow(m_proxyFetcherStatus);
-    layout->addWidget(provider);
-
     m_proxyTable = new QTableWidget(0, 7, page);
     m_proxyTable->setObjectName(QStringLiteral("proxyTable"));
     m_proxyTable->setHorizontalHeaderLabels({QStringLiteral("Profile"), QStringLiteral("Host"),
@@ -262,6 +231,70 @@ QWidget* MainWindow::buildProxyPage()
     geoLayout->addRow(m_geoResult);
     connect(resolveButton, &QPushButton::clicked, this, &MainWindow::resolveGeoIp);
     layout->addWidget(geoGroup);
+
+    return page;
+}
+
+QWidget* MainWindow::buildProxyFetcherPage()
+{
+    auto* page = new QWidget;
+    page->setObjectName(QStringLiteral("proxyAutoFetcherPage"));
+    auto* layout = new QVBoxLayout(page);
+    auto* heading = new QLabel(QStringLiteral("Proxy Auto-Fetcher"), page);
+    heading->setStyleSheet(QStringLiteral("font-size: 22px; font-weight: 700;"));
+    layout->addWidget(heading);
+    auto* description = new QLabel(
+        QStringLiteral("Connect a provider API, validate latency, and keep the active proxy pool fresh."), page);
+    description->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
+    description->setWordWrap(true);
+    layout->addWidget(description);
+
+    auto* provider = new QGroupBox(QStringLiteral("Provider API"), page);
+    provider->setObjectName(QStringLiteral("proxyProviderGroup"));
+    auto* providerForm = new QFormLayout(provider);
+    m_proxyProviderFormat = new QComboBox(provider);
+    m_proxyProviderFormat->setObjectName(QStringLiteral("proxyProviderFormat"));
+    m_proxyProviderFormat->addItem(QStringLiteral("Auto-detect"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::AutoDetect));
+    m_proxyProviderFormat->addItem(QStringLiteral("Webshare"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::Webshare));
+    m_proxyProviderFormat->addItem(QStringLiteral("IPRoyal"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::IPRoyal));
+    m_proxyProviderFormat->addItem(QStringLiteral("Custom JSON API"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::Custom));
+    m_proxyProviderApiUrl = new QLineEdit(provider);
+    m_proxyProviderApiUrl->setObjectName(QStringLiteral("proxyProviderApiUrl"));
+    m_proxyProviderApiUrl->setPlaceholderText(
+        QStringLiteral("https://proxy-provider.example/api/proxies"));
+    m_proxyProviderToken = new QLineEdit(provider);
+    m_proxyProviderToken->setObjectName(QStringLiteral("proxyProviderToken"));
+    m_proxyProviderToken->setEchoMode(QLineEdit::Password);
+    m_proxyProviderToken->setPlaceholderText(QStringLiteral("API key or token"));
+    m_fetchProxiesButton = new QPushButton(QStringLiteral("Fetch Proxies"), provider);
+    m_fetchProxiesButton->setObjectName(QStringLiteral("fetchProxies"));
+    m_proxyFetcherStatus = new QLabel(QStringLiteral("Ready to connect."), provider);
+    m_proxyFetcherStatus->setObjectName(QStringLiteral("proxyFetcherStatus"));
+    m_proxyFetcherStatus->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
+    providerForm->addRow(QStringLiteral("Provider"), m_proxyProviderFormat);
+    providerForm->addRow(QStringLiteral("API URL"), m_proxyProviderApiUrl);
+    providerForm->addRow(QStringLiteral("Token"), m_proxyProviderToken);
+    providerForm->addRow(m_fetchProxiesButton);
+    providerForm->addRow(m_proxyFetcherStatus);
+    layout->addWidget(provider);
+
+    m_fetchedProxyTable = new QTableWidget(0, 6, page);
+    m_fetchedProxyTable->setObjectName(QStringLiteral("fetchedProxyTable"));
+    m_fetchedProxyTable->setHorizontalHeaderLabels(
+        {QStringLiteral("Host"), QStringLiteral("Port"), QStringLiteral("Type"),
+         QStringLiteral("Location"), QStringLiteral("Latency"), QStringLiteral("Authentication")});
+    m_fetchedProxyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_fetchedProxyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_fetchedProxyTable->setAlternatingRowColors(true);
+    layout->addWidget(m_fetchedProxyTable, 1);
+    auto* hint = new QLabel(
+        QStringLiteral("Enter provider credentials in Proxy Pool, then fetch and test the inventory."), page);
+    hint->setStyleSheet(QStringLiteral("color: #6B7280;"));
+    layout->addWidget(hint);
 
     connect(m_fetchProxiesButton, &QPushButton::clicked, this, [this] {
         const QUrl apiUrl = QUrl::fromUserInput(m_proxyProviderApiUrl->text().trimmed());
@@ -308,36 +341,6 @@ QWidget* MainWindow::buildProxyPage()
     return page;
 }
 
-QWidget* MainWindow::buildProxyFetcherPage()
-{
-    auto* page = new QWidget;
-    page->setObjectName(QStringLiteral("proxyAutoFetcherPage"));
-    auto* layout = new QVBoxLayout(page);
-    auto* heading = new QLabel(QStringLiteral("Proxy Auto-Fetcher"), page);
-    heading->setStyleSheet(QStringLiteral("font-size: 22px; font-weight: 700;"));
-    layout->addWidget(heading);
-    auto* description = new QLabel(
-        QStringLiteral("Connect a provider API, validate latency, and keep the active proxy pool fresh."), page);
-    description->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
-    description->setWordWrap(true);
-    layout->addWidget(description);
-
-    m_fetchedProxyTable = new QTableWidget(0, 6, page);
-    m_fetchedProxyTable->setObjectName(QStringLiteral("fetchedProxyTable"));
-    m_fetchedProxyTable->setHorizontalHeaderLabels(
-        {QStringLiteral("Host"), QStringLiteral("Port"), QStringLiteral("Type"),
-         QStringLiteral("Location"), QStringLiteral("Latency"), QStringLiteral("Authentication")});
-    m_fetchedProxyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_fetchedProxyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_fetchedProxyTable->setAlternatingRowColors(true);
-    layout->addWidget(m_fetchedProxyTable, 1);
-    auto* hint = new QLabel(
-        QStringLiteral("Enter provider credentials in Proxy Pool, then fetch and test the inventory."), page);
-    hint->setStyleSheet(QStringLiteral("color: #6B7280;"));
-    layout->addWidget(hint);
-    return page;
-}
-
 QWidget* MainWindow::buildDiagnosticsPage()
 {
     auto* page = new QWidget;
@@ -379,15 +382,64 @@ QWidget* MainWindow::buildSettingsPage()
     layout->addWidget(heading);
     auto* appearance = new QGroupBox(QStringLiteral("Appearance"), page);
     auto* appearanceLayout = new QVBoxLayout(appearance);
-    auto* compact = new QCheckBox(QStringLiteral("Use compact profile cards"), appearance);
-    compact->setObjectName(QStringLiteral("compactCards"));
-    compact->setChecked(false);
-    appearanceLayout->addWidget(compact);
+    QSettings settings;
+    m_compactCards = new QCheckBox(QStringLiteral("Use compact profile cards"), appearance);
+    m_compactCards->setObjectName(QStringLiteral("compactCards"));
+    m_compactCards->setChecked(settings.value(QStringLiteral("ui/compactCards"), false).toBool());
+    appearanceLayout->addWidget(m_compactCards);
     auto* privacy = new QCheckBox(QStringLiteral("Keep WebRTC on proxied interfaces only"), appearance);
     privacy->setChecked(true);
     privacy->setEnabled(false);
     appearanceLayout->addWidget(privacy);
     layout->addWidget(appearance);
+
+    auto* behavior = new QGroupBox(QStringLiteral("Profile defaults"), page);
+    auto* behaviorLayout = new QFormLayout(behavior);
+    m_killSwitchEnabled = new QCheckBox(QStringLiteral("Enable automatic kill switch"), behavior);
+    m_killSwitchEnabled->setObjectName(QStringLiteral("killSwitchEnabled"));
+    m_killSwitchEnabled->setChecked(
+        settings.value(QStringLiteral("network/killSwitchEnabled"), true).toBool());
+    m_defaultTimezone = new QComboBox(behavior);
+    m_defaultTimezone->setObjectName(QStringLiteral("defaultTimezone"));
+    m_defaultTimezone->setEditable(true);
+    m_defaultTimezone->addItems({QStringLiteral("UTC"), QStringLiteral("America/New_York"),
+                                 QStringLiteral("Europe/London"), QStringLiteral("Europe/Berlin"),
+                                 QStringLiteral("Asia/Tokyo")});
+    m_defaultTimezone->setCurrentText(
+        settings.value(QStringLiteral("profiles/defaultTimezone"), QStringLiteral("UTC")).toString());
+    behaviorLayout->addRow(m_killSwitchEnabled);
+    behaviorLayout->addRow(QStringLiteral("Default timezone"), m_defaultTimezone);
+    layout->addWidget(behavior);
+
+    connect(m_compactCards, &QCheckBox::toggled, this, [this](bool compact) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("ui/compactCards"), compact);
+        settings.sync();
+        for (const auto& [id, card] : m_profileCards) {
+            Q_UNUSED(id);
+            card->setMinimumHeight(compact ? 210 : 248);
+        }
+    });
+    connect(m_defaultTimezone, &QComboBox::currentTextChanged, this, [](const QString& timezone) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("profiles/defaultTimezone"), timezone);
+        settings.sync();
+    });
+    connect(m_killSwitchEnabled, &QCheckBox::toggled, this, [this](bool enabled) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("network/killSwitchEnabled"), enabled);
+        settings.sync();
+        for (const auto& [id, engine] : m_killSwitches) {
+            ProfileInstance* profile = m_profileManager->profile(id);
+            if (enabled && profile != nullptr
+                && profile->state() == ProfileInstance::State::Running
+                && profile->config().proxy.type() != QNetworkProxy::NoProxy) {
+                engine->startMonitoring();
+            } else {
+                engine->stopMonitoring();
+            }
+        }
+    });
     layout->addStretch(1);
     return page;
 }
@@ -396,6 +448,7 @@ ProfileInstance& MainWindow::addProfile(const ProfileConfig& config)
 {
     ProfileInstance& profile = m_profileManager->createProfile(config);
     auto* card = new ProfileCardWidget(&profile);
+    card->setMinimumHeight(m_compactCards != nullptr && m_compactCards->isChecked() ? 210 : 248);
     const int index = static_cast<int>(m_profileCards.size());
     m_profileGrid->addWidget(card, index / 2, index % 2);
     m_profileCards.emplace(config.id, card);
@@ -471,9 +524,9 @@ void MainWindow::showCreateProfileDialog()
     auto* layout = new QVBoxLayout(&dialog);
     auto* presets = new QGroupBox(QStringLiteral("One-click fingerprint presets"), &dialog);
     auto* presetLayout = new QHBoxLayout(presets);
-    auto* windowsPreset = new QPushButton(QStringLiteral("Windows 11"), presets);
+    auto* windowsPreset = new QPushButton(QStringLiteral("Windows / Chrome"), presets);
     windowsPreset->setObjectName(QStringLiteral("windowsPreset"));
-    auto* macPreset = new QPushButton(QStringLiteral("macOS"), presets);
+    auto* macPreset = new QPushButton(QStringLiteral("macOS / Safari"), presets);
     macPreset->setObjectName(QStringLiteral("macPreset"));
     auto* linuxPreset = new QPushButton(QStringLiteral("Linux"), presets);
     linuxPreset->setObjectName(QStringLiteral("linuxPreset"));
@@ -507,13 +560,19 @@ void MainWindow::showCreateProfileDialog()
     proxyPort->setObjectName(QStringLiteral("proxyPortInput"));
     proxyPort->setRange(1, 65535);
     proxyPort->setValue(8080);
+    auto* proxyUsername = new QLineEdit(&dialog);
+    proxyUsername->setObjectName(QStringLiteral("proxyUsernameInput"));
+    auto* proxyPassword = new QLineEdit(&dialog);
+    proxyPassword->setObjectName(QStringLiteral("proxyPasswordInput"));
+    proxyPassword->setEchoMode(QLineEdit::Password);
     auto* expectedIp = new QLineEdit(&dialog);
     expectedIp->setObjectName(QStringLiteral("expectedProxyIpInput"));
     auto* verificationUrl = new QLineEdit(&dialog);
     verificationUrl->setObjectName(QStringLiteral("proxyVerificationUrlInput"));
     verificationUrl->setPlaceholderText(QStringLiteral("https://api.ipify.org"));
 
-    auto* timezone = new QLineEdit(QStringLiteral("UTC"), &dialog);
+    auto* timezone = new QLineEdit(
+        m_defaultTimezone == nullptr ? QStringLiteral("UTC") : m_defaultTimezone->currentText(), &dialog);
     timezone->setObjectName(QStringLiteral("timezoneInput"));
     auto* timezoneOffset = new QSpinBox(&dialog);
     timezoneOffset->setObjectName(QStringLiteral("timezoneOffsetInput"));
@@ -533,6 +592,8 @@ void MainWindow::showCreateProfileDialog()
     form->addRow(QStringLiteral("Proxy type"), proxyType);
     form->addRow(QStringLiteral("Proxy host"), proxyHost);
     form->addRow(QStringLiteral("Proxy port"), proxyPort);
+    form->addRow(QStringLiteral("Proxy username"), proxyUsername);
+    form->addRow(QStringLiteral("Proxy password"), proxyPassword);
     form->addRow(QStringLiteral("Expected exit IP"), expectedIp);
     form->addRow(QStringLiteral("Verification URL"), verificationUrl);
     form->addRow(QStringLiteral("Timezone"), timezone);
@@ -549,8 +610,8 @@ void MainWindow::showCreateProfileDialog()
                 "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"));
         } else if (preset == QStringLiteral("mac")) {
             userAgent->setText(QStringLiteral(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"));
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 "
+                "(KHTML, like Gecko) Version/17.6 Safari/605.1.15"));
         } else {
             userAgent->setText(QStringLiteral(
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -567,10 +628,13 @@ void MainWindow::showCreateProfileDialog()
     connect(regenerateSeed, &QPushButton::clicked, &dialog,
             [masterSeed] { masterSeed->setText(generateMasterSeed()); });
 
-    const auto updateProxyFields = [proxyType, proxyHost, proxyPort, expectedIp, verificationUrl] {
+    const auto updateProxyFields = [proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword,
+                                    expectedIp, verificationUrl] {
         const bool enabled = proxyType->currentData().toInt() != QNetworkProxy::NoProxy;
         proxyHost->setEnabled(enabled);
         proxyPort->setEnabled(enabled);
+        proxyUsername->setEnabled(enabled);
+        proxyPassword->setEnabled(enabled);
         expectedIp->setEnabled(enabled);
         verificationUrl->setEnabled(enabled);
     };
@@ -581,6 +645,7 @@ void MainWindow::showCreateProfileDialog()
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
                                          Qt::Horizontal, &dialog);
     buttons->setObjectName(QStringLiteral("createProfileButtons"));
+    buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("Save"));
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addWidget(buttons);
@@ -603,7 +668,8 @@ void MainWindow::showCreateProfileDialog()
             proxyType->currentData().toInt());
         if (selectedProxyType != QNetworkProxy::NoProxy) {
             config.proxy = QNetworkProxy(selectedProxyType, proxyHost->text().trimmed(),
-                                         static_cast<quint16>(proxyPort->value()));
+                                         static_cast<quint16>(proxyPort->value()),
+                                         proxyUsername->text(), proxyPassword->text());
             config.expectedProxyIp = expectedIp->text().trimmed();
             config.proxyVerificationUrl = QUrl::fromUserInput(verificationUrl->text().trimmed());
         }
@@ -632,7 +698,8 @@ void MainWindow::launchProfile(const QString& profileId)
             profile->view()->resize(1100, 720);
             profile->view()->show();
         }
-        if (profile->config().proxy.type() != QNetworkProxy::NoProxy) {
+        if (profile->config().proxy.type() != QNetworkProxy::NoProxy
+            && m_killSwitchEnabled != nullptr && m_killSwitchEnabled->isChecked()) {
             m_killSwitches.at(profileId)->startMonitoring();
         }
         if (ProfileCardWidget* card = profileCard(profileId); card != nullptr
@@ -673,11 +740,13 @@ void MainWindow::showCookieInspector(const QString& profileId)
         return;
     }
     auto* dialog = new QDialog(this);
+    dialog->setObjectName(QStringLiteral("cookieInspectorDialog"));
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowTitle(QStringLiteral("Cookies — %1").arg(profile->config().name));
     dialog->resize(760, 420);
     auto* layout = new QVBoxLayout(dialog);
     auto* table = new QTableWidget(0, 5, dialog);
+    table->setObjectName(QStringLiteral("cookieInspectorTable"));
     table->setHorizontalHeaderLabels({QStringLiteral("Domain"), QStringLiteral("Name"),
                                       QStringLiteral("Path"), QStringLiteral("Secure"),
                                       QStringLiteral("HTTP Only")});

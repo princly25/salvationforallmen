@@ -30,6 +30,7 @@ private slots:
     void sandboxCreatesDistinctStorageTrees();
     void profilePlansWebEngineStorageWithoutLaunchingChromium();
     void freezeBlocksRequestsImmediately();
+    void clientHintsOnlyTargetGoogleServices();
     void managerRejectsDuplicateIds();
 };
 
@@ -103,6 +104,18 @@ void Module1Test::freezeBlocksRequestsImmediately()
     QCOMPARE(profile.state(), ProfileInstance::State::Ready);
     QVERIFY(!profile.urlInterceptor()->shouldBlock(QUrl(QStringLiteral("https://example.test"))));
     QVERIFY(profile.urlInterceptor()->shouldBlock(QUrl::fromLocalFile(QStringLiteral("/tmp/secret"))));
+}
+
+void Module1Test::clientHintsOnlyTargetGoogleServices()
+{
+    CustomUrlInterceptor interceptor(
+        QStringLiteral("Mozilla/5.0 Chrome/126.0.0.0 Safari/537.36"),
+        QStringLiteral("Windows"));
+    QVERIFY(interceptor.isGoogleService(QUrl(QStringLiteral("https://www.google.com/search"))));
+    QVERIFY(interceptor.isGoogleService(QUrl(QStringLiteral("https://fonts.googleapis.com/css"))));
+    QVERIFY(interceptor.isGoogleService(QUrl(QStringLiteral("https://youtube.com/watch"))));
+    QVERIFY(!interceptor.isGoogleService(QUrl(QStringLiteral("https://evilgoogle.com/"))));
+    QVERIFY(!interceptor.isGoogleService(QUrl(QStringLiteral("https://example.com/"))));
 }
 
 void Module1Test::managerRejectsDuplicateIds()

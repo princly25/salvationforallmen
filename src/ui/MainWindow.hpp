@@ -10,6 +10,7 @@
 #include <memory>
 
 class KillSwitchEngine;
+class QCheckBox;
 class QComboBox;
 class QLabel;
 class QGridLayout;
@@ -83,4 +84,7 @@ private:
     QLabel* m_latencyStatus{nullptr};
     QLabel* m_proxyStatus{nullptr};
     QLabel* m_killSwitchStatus{nullptr};
+    QCheckBox* m_compactCards{nullptr};
+    QCheckBox* m_killSwitchEnabled{nullptr};
+    QComboBox* m_defaultTimezone{nullptr};
 };

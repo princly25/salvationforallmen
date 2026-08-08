@@ -31,7 +31,16 @@ ProfileInstance::ProfileInstance(const ProfileConfig& config, const QString& sto
     }
 
     setupStoragePaths();
-    m_interceptor = std::make_unique<CustomUrlInterceptor>();
+    const QString platform = m_config.userAgent.contains(QStringLiteral("Android"), Qt::CaseInsensitive)
+        ? QStringLiteral("Android")
+        : (m_config.userAgent.contains(QStringLiteral("iPhone"), Qt::CaseInsensitive)
+               ? QStringLiteral("iOS")
+               : (m_config.userAgent.contains(QStringLiteral("Windows"), Qt::CaseInsensitive)
+                      ? QStringLiteral("Windows")
+                      : (m_config.userAgent.contains(QStringLiteral("Macintosh"), Qt::CaseInsensitive)
+                             ? QStringLiteral("macOS")
+                             : QStringLiteral("Linux"))));
+    m_interceptor = std::make_unique<CustomUrlInterceptor>(m_config.userAgent, platform);
     setupNetworkProxy();
     injectFingerprintScripts();
 }

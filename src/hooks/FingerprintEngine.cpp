@@ -179,7 +179,12 @@ QString FingerprintEngine::generateInjectionScript(const ProfileConfig& config,
     const geoTimeZone = __TIMEZONE__;
     const GeoDateTimeFormat = function(locales, options) {
       const synchronizedOptions = Object.assign({}, options || {}, { timeZone: geoTimeZone });
-      return new OriginalDateTimeFormat(locales, synchronizedOptions);
+      // Chromium's default locale is determined independently from the
+      // navigator properties we expose.  Use the synchronized regional
+      // language whenever callers do not provide an explicit locale, while
+      // preserving the native behavior for explicit locale arguments.
+      const effectiveLocales = locales === undefined ? languages : locales;
+      return new OriginalDateTimeFormat(effectiveLocales, synchronizedOptions);
     };
     Object.defineProperty(GeoDateTimeFormat, 'name', { value: 'DateTimeFormat' });
     Object.defineProperty(GeoDateTimeFormat, 'length', { value: 0 });
