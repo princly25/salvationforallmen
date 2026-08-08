@@ -17,6 +17,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
       - name: Install Qt 6
         uses: jurplel/install-qt-action@v4
         with:
