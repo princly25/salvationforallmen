@@ -101,4 +101,12 @@ if(ADB_BUILD_TESTS)
     target_link_libraries(test_module4 PRIVATE adb_core Qt6::Test)
     add_test(NAME module4_network_kill_switch COMMAND test_module4)
     set_tests_properties(module4_network_kill_switch PROPERTIES TIMEOUT 30)
+
+    add_executable(test_live_rigorous tests/test_live_rigorous.cpp)
+    target_link_libraries(test_live_rigorous PRIVATE adb_core Qt6::Test)
+    add_test(NAME live_rigorous_network_privacy COMMAND test_live_rigorous)
+    set_tests_properties(live_rigorous_network_privacy PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox --disable-gpu --no-zygote --force-webrtc-ip-handling-policy=disable_non_proxied_udp;QTWEBENGINE_DISABLE_SANDBOX=1"
+        TIMEOUT 45
+    )
 endif()

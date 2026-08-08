@@ -152,8 +152,7 @@ void NetworkMonitor::recordFailure(NetworkStatus failureStatus)
 {
     ++m_consecutiveFailures;
     m_status = failureStatus;
-    const int failureThreshold = failureStatus == NetworkStatus::ProxyDegraded ? 3 : 1;
-    if (!m_emergencyRaised && m_consecutiveFailures >= failureThreshold) {
+    if (!m_emergencyRaised) {
         m_emergencyRaised = true;
         emit networkEmergencyTriggered(failureStatus);
     }

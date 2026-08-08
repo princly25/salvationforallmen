@@ -10,6 +10,7 @@ CustomUrlInterceptor::CustomUrlInterceptor(QObject* parent)
 void CustomUrlInterceptor::interceptRequest(QWebEngineUrlRequestInfo& info)
 {
     if (shouldBlock(info.requestUrl())) {
+        m_blockedRequestCount.fetch_add(1, std::memory_order_relaxed);
         info.block(true);
     }
 }
@@ -34,3 +35,7 @@ bool CustomUrlInterceptor::shouldBlock(const QUrl& url) const noexcept
     return scheme == QStringLiteral("file") || scheme == QStringLiteral("qrc");
 }
 
+std::uint64_t CustomUrlInterceptor::blockedRequestCount() const noexcept
+{
+    return m_blockedRequestCount.load(std::memory_order_relaxed);
+}

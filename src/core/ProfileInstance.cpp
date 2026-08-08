@@ -45,6 +45,9 @@ void ProfileInstance::initializeWebEngineProfile()
     m_profile->setCachePath(m_paths.cachePath);
     m_profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
     m_profile->setHttpUserAgent(m_config.userAgent);
+    m_profile->setHttpAcceptLanguage(m_config.languages.join(QStringLiteral(",")));
+    m_profile->settings()->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
+    m_profile->settings()->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, false);
 
     m_profile->setUrlRequestInterceptor(m_interceptor.get());
     ProfileSeedEngine seedEngine(m_config.hardware.masterSeedHex);

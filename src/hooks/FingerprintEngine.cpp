@@ -7,6 +7,8 @@
 #include <QWebEngineProfile>
 #include <QWebEngineScriptCollection>
 
+#include <limits>
+
 QString FingerprintEngine::javascriptLiteral(const QString& value)
 {
     const QByteArray encoded = QJsonDocument(QJsonArray{value}).toJson(QJsonDocument::Compact);
@@ -22,9 +24,27 @@ QString FingerprintEngine::javascriptStringArray(const QStringList& values)
     return QString::fromUtf8(QJsonDocument(array).toJson(QJsonDocument::Compact));
 }
 
+FingerprintNoiseParameters
+FingerprintEngine::deriveNoiseParameters(const ProfileSeedEngine& seedEngine)
+{
+    FingerprintNoiseParameters parameters;
+    parameters.canvasSeed = seedEngine.deriveSeed("canvas_noise");
+    parameters.webglSeed = seedEngine.deriveSeed("webgl_parameter_noise");
+    parameters.audioSeed = seedEngine.deriveSeed("audio_frequency_noise");
+    parameters.canvasBitShift = 1 + static_cast<int>(parameters.canvasSeed % 7U);
+    parameters.webglParameterOffset = 1 + static_cast<int>(parameters.webglSeed % 31U);
+    parameters.audioFrequencyOffset =
+        seedEngine.deriveFloat("audio_frequency_offset", -0.0005, 0.0005);
+    if (parameters.audioFrequencyOffset == 0.0) {
+        parameters.audioFrequencyOffset = std::numeric_limits<double>::epsilon();
+    }
+    return parameters;
+}
+
 QString FingerprintEngine::generateInjectionScript(const ProfileConfig& config,
                                                    const ProfileSeedEngine& seedEngine)
 {
+    const FingerprintNoiseParameters noise = deriveNoiseParameters(seedEngine);
     QString script = QStringLiteral(R"JS(
 (() => {
   'use strict';
@@ -63,20 +83,25 @@ QString FingerprintEngine::generateInjectionScript(const ProfileConfig& config,
     constructor.prototype.getParameter = function(parameter) {
       if (parameter === 0x9245) return __WEBGL_VENDOR__;
       if (parameter === 0x9246) return __WEBGL_RENDERER__;
-      return Reflect.apply(original, this, arguments);
+      const value = Reflect.apply(original, this, arguments);
+      if ((parameter === 0x0D33 || parameter === 0x84E8) && Number.isFinite(value)) {
+        return Math.max(1, value - __WEBGL_PARAMETER_OFFSET__);
+      }
+      return value;
     };
   };
   patchWebGL(globalThis.WebGLRenderingContext);
   patchWebGL(globalThis.WebGL2RenderingContext);
 
   const canvasSeed = __CANVAS_SEED__ >>> 0;
+  const canvasBitShift = __CANVAS_BIT_SHIFT__;
   const applyCanvasNoise = (image) => {
     if (!image || !image.data) return image;
     const pixelCount = Math.floor(image.data.length / 4);
     if (pixelCount < 1) return image;
     const startPixel = canvasSeed % Math.min(pixelCount, 16);
     for (let pixel = startPixel; pixel < pixelCount; pixel += 16) {
-      image.data[pixel * 4] = image.data[pixel * 4] ^ 1;
+      image.data[pixel * 4] = image.data[pixel * 4] ^ canvasBitShift;
     }
     return image;
   };
@@ -120,14 +145,15 @@ QString FingerprintEngine::generateInjectionScript(const ProfileConfig& config,
   }
 
   const audioSeed = __AUDIO_SEED__ >>> 0;
+  const audioFrequencyOffset = __AUDIO_FREQUENCY_OFFSET__;
   if (globalThis.AudioBuffer && AudioBuffer.prototype && typeof AudioBuffer.prototype.getChannelData === 'function') {
     const originalGetChannelData = AudioBuffer.prototype.getChannelData;
     const processed = new WeakSet();
     AudioBuffer.prototype.getChannelData = function() {
       const data = Reflect.apply(originalGetChannelData, this, arguments);
       if (data && !processed.has(data)) {
-        const signedNoise = (audioSeed % 2001) - 1000;
-        const noise = (signedNoise === 0 ? 1 : signedNoise) * 1e-10;
+        const signedNoise = (audioSeed & 1) === 0 ? 1 : -1;
+        const noise = signedNoise * audioFrequencyOffset;
         for (let index = 0; index < data.length; index += 100) data[index] += noise;
         processed.add(data);
       }
@@ -176,10 +202,14 @@ QString FingerprintEngine::generateInjectionScript(const ProfileConfig& config,
     script.replace(QStringLiteral("__MEMORY_GB__"), QString::number(config.hardware.memoryGb));
     script.replace(QStringLiteral("__SCREEN_WIDTH__"), QString::number(config.hardware.screenWidth));
     script.replace(QStringLiteral("__SCREEN_HEIGHT__"), QString::number(config.hardware.screenHeight));
-    script.replace(QStringLiteral("__CANVAS_SEED__"),
-                   QString::number(seedEngine.deriveSeed("canvas_noise")));
-    script.replace(QStringLiteral("__AUDIO_SEED__"),
-                   QString::number(seedEngine.deriveSeed("audio_noise")));
+    script.replace(QStringLiteral("__CANVAS_SEED__"), QString::number(noise.canvasSeed));
+    script.replace(QStringLiteral("__CANVAS_BIT_SHIFT__"),
+                   QString::number(noise.canvasBitShift));
+    script.replace(QStringLiteral("__WEBGL_PARAMETER_OFFSET__"),
+                   QString::number(noise.webglParameterOffset));
+    script.replace(QStringLiteral("__AUDIO_SEED__"), QString::number(noise.audioSeed));
+    script.replace(QStringLiteral("__AUDIO_FREQUENCY_OFFSET__"),
+                   QString::number(noise.audioFrequencyOffset, 'g', 17));
     script.replace(QStringLiteral("__TIMEZONE_OFFSET__"),
                    QString::number(-config.timezoneOffsetMinutes));
     script.replace(QStringLiteral("__LANGUAGES__"), javascriptStringArray(config.languages));
