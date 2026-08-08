@@ -81,8 +81,14 @@ target_link_libraries(AntiDetectBrowser PRIVATE adb_core)
 
 if(WIN32)
     target_include_directories(adb_core PRIVATE "${minhook_SOURCE_DIR}/include")
+    target_sources(adb_core PRIVATE
+        "${minhook_SOURCE_DIR}/src/buffer.c"
+        "${minhook_SOURCE_DIR}/src/hook.c"
+        "${minhook_SOURCE_DIR}/src/trampoline.c"
+        "${minhook_SOURCE_DIR}/src/hde/hde64.c"
+    )
     target_compile_definitions(adb_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(adb_core PUBLIC MinHook iphlpapi)
+    target_link_libraries(adb_core PUBLIC iphlpapi)
 endif()
 
 if(ADB_BUILD_TESTS)
