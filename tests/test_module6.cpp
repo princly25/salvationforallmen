@@ -8,7 +8,10 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QHostAddress>
 #include <QPushButton>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTest>
@@ -41,6 +44,7 @@ private slots:
     void profileCreationDialogCreatesProfile();
     void profileCardControlsLifecycle();
     void proxyAndGeoControlsReflectProfile();
+    void proxyProviderFetchPopulatesActivePool();
     void statusBarReflectsNetworkHealth();
 };
 
@@ -59,6 +63,12 @@ void Module6Test::dashboardBuildsRequiredSurfaces()
     QCOMPARE(navigation->item(4)->text(), QStringLiteral("Settings"));
     QVERIFY(window.findChild<QPushButton*>(QStringLiteral("createProfile")) != nullptr);
     QVERIFY(window.findChild<QWidget*>(QStringLiteral("proxyAutoFetcherPage")) != nullptr);
+    QVERIFY(window.findChild<QLineEdit*>(QStringLiteral("proxyProviderApiUrl")) != nullptr);
+    QVERIFY(window.findChild<QLineEdit*>(QStringLiteral("proxyProviderToken")) != nullptr);
+    QVERIFY(window.findChild<QPushButton*>(QStringLiteral("fetchProxies")) != nullptr);
+    auto* fetchedTable = window.findChild<QTableWidget*>(QStringLiteral("fetchedProxyTable"));
+    QVERIFY(fetchedTable != nullptr);
+    QCOMPARE(fetchedTable->columnCount(), 6);
     QVERIFY(window.styleSheet().contains(QStringLiteral("#111827")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#1F2937")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#3B82F6")));
@@ -164,6 +174,45 @@ void Module6Test::proxyAndGeoControlsReflectProfile()
     QVERIFY(statusDot != nullptr);
     card->setProxyStatus(true, 42, QStringLiteral("203.0.113.21 · US"));
     QVERIFY(card->findChild<QLabel*>(QStringLiteral("proxyStatus"))->text().contains("42"));
+}
+
+void Module6Test::proxyProviderFetchPopulatesActivePool()
+{
+    QTcpServer latencyTarget;
+    QVERIFY(latencyTarget.listen(QHostAddress::LocalHost));
+    QTcpServer providerApi;
+    QVERIFY(providerApi.listen(QHostAddress::LocalHost));
+    connect(&providerApi, &QTcpServer::newConnection, &providerApi,
+            [&providerApi, port = latencyTarget.serverPort()] {
+                QTcpSocket* socket = providerApi.nextPendingConnection();
+                connect(socket, &QTcpSocket::readyRead, socket, [socket, port] {
+                    socket->readAll();
+                    const QByteArray body = QStringLiteral(
+                        R"JSON({"proxies":[{"host":"127.0.0.1","port":%1,"country":"LOCAL"}]})JSON")
+                                                .arg(port)
+                                                .toUtf8();
+                    socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                                  "Connection: close\r\nContent-Length: "
+                                  + QByteArray::number(body.size()) + "\r\n\r\n" + body);
+                    socket->disconnectFromHost();
+                });
+            });
+
+    QTemporaryDir temporaryRoot;
+    MainWindow window(temporaryRoot.path());
+    window.findChild<QLineEdit*>(QStringLiteral("proxyProviderApiUrl"))
+        ->setText(QStringLiteral("http://127.0.0.1:%1/proxies").arg(providerApi.serverPort()));
+    window.findChild<QLineEdit*>(QStringLiteral("proxyProviderToken"))
+        ->setText(QStringLiteral("ui-token"));
+    window.findChild<QPushButton*>(QStringLiteral("fetchProxies"))->click();
+
+    auto* fetched = window.findChild<QTableWidget*>(QStringLiteral("fetchedProxyTable"));
+    auto* active = window.findChild<QTableWidget*>(QStringLiteral("proxyTable"));
+    QTRY_COMPARE_WITH_TIMEOUT(fetched->rowCount(), 1, 3000);
+    QCOMPARE(active->rowCount(), 1);
+    QCOMPARE(active->item(0, 0)->text(), QStringLiteral("Available"));
+    QVERIFY(window.findChild<QLabel*>(QStringLiteral("proxyFetcherStatus"))
+                ->text().contains(QStringLiteral("Active pool updated")));
 }
 
 void Module6Test::statusBarReflectsNetworkHealth()

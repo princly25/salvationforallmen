@@ -2,6 +2,7 @@
 
 #include "core/ProfileManager.hpp"
 #include "network/NetworkMonitor.hpp"
+#include "network/ProxyFetcher.hpp"
 
 #include <QMainWindow>
 
@@ -9,11 +10,13 @@
 #include <memory>
 
 class KillSwitchEngine;
+class QComboBox;
 class QLabel;
 class QGridLayout;
 class QLineEdit;
 class QListWidget;
 class QPlainTextEdit;
+class QPushButton;
 class QStackedWidget;
 class QTableWidget;
 class QWidget;
@@ -53,11 +56,13 @@ private:
     QWidget* buildDiagnosticsPage();
     QWidget* buildSettingsPage();
     void addProxyTableRow(const ProfileConfig& config);
+    void populateFetchedProxyPool(const QList<ProxyEndpoint>& proxies);
     void handleContainment(const QString& profileId, bool contained, NetworkStatus status);
     [[nodiscard]] bool hasContainedProfile() const noexcept;
     static QString networkStatusName(NetworkStatus status);
 
     std::unique_ptr<ProfileManager> m_profileManager;
+    std::unique_ptr<ProxyProviderManager> m_proxyProviderManager;
     std::map<QString, std::unique_ptr<KillSwitchEngine>> m_killSwitches;
     std::map<QString, ProfileCardWidget*> m_profileCards;
     QListWidget* m_navigation{nullptr};
@@ -65,6 +70,12 @@ private:
     QGridLayout* m_profileGrid{nullptr};
     QLabel* m_emptyProfilesLabel{nullptr};
     QTableWidget* m_proxyTable{nullptr};
+    QTableWidget* m_fetchedProxyTable{nullptr};
+    QLineEdit* m_proxyProviderApiUrl{nullptr};
+    QLineEdit* m_proxyProviderToken{nullptr};
+    QComboBox* m_proxyProviderFormat{nullptr};
+    QPushButton* m_fetchProxiesButton{nullptr};
+    QLabel* m_proxyFetcherStatus{nullptr};
     QLineEdit* m_geoDatabasePath{nullptr};
     QLineEdit* m_geoIpAddress{nullptr};
     QLabel* m_geoResult{nullptr};

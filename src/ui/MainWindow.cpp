@@ -40,6 +40,7 @@
 #include <QWebEngineView>
 
 #include <optional>
+#include <algorithm>
 #include <stdexcept>
 
 namespace {
@@ -58,6 +59,7 @@ QString generateMasterSeed()
 MainWindow::MainWindow(QString storageRoot, QWidget* parent)
     : QMainWindow(parent)
     , m_profileManager(std::make_unique<ProfileManager>(std::move(storageRoot)))
+    , m_proxyProviderManager(std::make_unique<ProxyProviderManager>())
 {
     buildUi();
 }
@@ -198,11 +200,45 @@ QWidget* MainWindow::buildProxyPage()
     description->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
     layout->addWidget(description);
 
-    m_proxyTable = new QTableWidget(0, 5, page);
+    auto* provider = new QGroupBox(QStringLiteral("Provider API"), page);
+    auto* providerForm = new QFormLayout(provider);
+    m_proxyProviderFormat = new QComboBox(provider);
+    m_proxyProviderFormat->setObjectName(QStringLiteral("proxyProviderFormat"));
+    m_proxyProviderFormat->addItem(QStringLiteral("Auto-detect"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::AutoDetect));
+    m_proxyProviderFormat->addItem(QStringLiteral("Webshare"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::Webshare));
+    m_proxyProviderFormat->addItem(QStringLiteral("IPRoyal"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::IPRoyal));
+    m_proxyProviderFormat->addItem(QStringLiteral("Custom JSON API"),
+                                   static_cast<int>(ProxyProviderManager::ProviderFormat::Custom));
+    m_proxyProviderApiUrl = new QLineEdit(provider);
+    m_proxyProviderApiUrl->setObjectName(QStringLiteral("proxyProviderApiUrl"));
+    m_proxyProviderApiUrl->setPlaceholderText(
+        QStringLiteral("https://proxy-provider.example/api/proxies"));
+    m_proxyProviderToken = new QLineEdit(provider);
+    m_proxyProviderToken->setObjectName(QStringLiteral("proxyProviderToken"));
+    m_proxyProviderToken->setEchoMode(QLineEdit::Password);
+    m_proxyProviderToken->setPlaceholderText(QStringLiteral("API key or token"));
+    m_fetchProxiesButton = new QPushButton(QStringLiteral("Fetch and Test Proxies"), provider);
+    m_fetchProxiesButton->setObjectName(QStringLiteral("fetchProxies"));
+    m_proxyFetcherStatus = new QLabel(QStringLiteral("Ready to connect."), provider);
+    m_proxyFetcherStatus->setObjectName(QStringLiteral("proxyFetcherStatus"));
+    m_proxyFetcherStatus->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
+    providerForm->addRow(QStringLiteral("Provider"), m_proxyProviderFormat);
+    providerForm->addRow(QStringLiteral("API URL"), m_proxyProviderApiUrl);
+    providerForm->addRow(QStringLiteral("Token"), m_proxyProviderToken);
+    providerForm->addRow(m_fetchProxiesButton);
+    providerForm->addRow(m_proxyFetcherStatus);
+    layout->addWidget(provider);
+
+    m_proxyTable = new QTableWidget(0, 7, page);
     m_proxyTable->setObjectName(QStringLiteral("proxyTable"));
     m_proxyTable->setHorizontalHeaderLabels({QStringLiteral("Profile"), QStringLiteral("Host"),
                                              QStringLiteral("Port"), QStringLiteral("Type"),
-                                             QStringLiteral("Expected Exit IP")});
+                                             QStringLiteral("Expected Exit IP"),
+                                             QStringLiteral("Location"),
+                                             QStringLiteral("Latency")});
     m_proxyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_proxyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     layout->addWidget(m_proxyTable, 1);
@@ -226,6 +262,49 @@ QWidget* MainWindow::buildProxyPage()
     geoLayout->addRow(m_geoResult);
     connect(resolveButton, &QPushButton::clicked, this, &MainWindow::resolveGeoIp);
     layout->addWidget(geoGroup);
+
+    connect(m_fetchProxiesButton, &QPushButton::clicked, this, [this] {
+        const QUrl apiUrl = QUrl::fromUserInput(m_proxyProviderApiUrl->text().trimmed());
+        const auto format = static_cast<ProxyProviderManager::ProviderFormat>(
+            m_proxyProviderFormat->currentData().toInt());
+        m_fetchProxiesButton->setEnabled(false);
+        m_proxyFetcherStatus->setStyleSheet(QStringLiteral("color: #93C5FD;"));
+        m_proxyFetcherStatus->setText(QStringLiteral("Fetching provider inventory…"));
+        m_proxyProviderManager->fetchProxies(apiUrl, m_proxyProviderToken->text(), format);
+    });
+    connect(m_proxyProviderManager.get(), &ProxyProviderManager::proxiesFetched, this,
+            [this](const QList<ProxyEndpoint>& proxies) {
+                m_proxyFetcherStatus->setText(
+                    QStringLiteral("Fetched %1 proxies. Testing TCP latency…").arg(proxies.size()));
+                m_proxyProviderManager->testLatencies(proxies);
+            });
+    connect(m_proxyProviderManager.get(), &ProxyProviderManager::fetchFailed, this,
+            [this](const QString& error) {
+                m_fetchProxiesButton->setEnabled(true);
+                m_proxyFetcherStatus->setStyleSheet(QStringLiteral("color: #F87171;"));
+                m_proxyFetcherStatus->setText(error);
+                addLogMessage(QStringLiteral("[proxy-provider] %1").arg(error));
+            });
+    connect(m_proxyProviderManager.get(), &ProxyProviderManager::latencyProgress, this,
+            [this](int completed, int total) {
+                m_proxyFetcherStatus->setText(
+                    QStringLiteral("Testing proxy latency: %1 / %2").arg(completed).arg(total));
+            });
+    connect(m_proxyProviderManager.get(), &ProxyProviderManager::latencyTestsFinished, this,
+            [this](const QList<ProxyEndpoint>& proxies) {
+                m_fetchProxiesButton->setEnabled(true);
+                populateFetchedProxyPool(proxies);
+                const int reachable = static_cast<int>(std::count_if(
+                    proxies.cbegin(), proxies.cend(),
+                    [](const ProxyEndpoint& proxy) { return proxy.reachable; }));
+                m_proxyFetcherStatus->setStyleSheet(QStringLiteral("color: #4ADE80;"));
+                m_proxyFetcherStatus->setText(
+                    QStringLiteral("Active pool updated: %1 / %2 proxies reachable.")
+                        .arg(reachable)
+                        .arg(proxies.size()));
+                addLogMessage(QStringLiteral("[proxy-provider] Pool updated with %1 reachable proxies.")
+                                  .arg(reachable));
+            });
     return page;
 }
 
@@ -243,31 +322,19 @@ QWidget* MainWindow::buildProxyFetcherPage()
     description->setWordWrap(true);
     layout->addWidget(description);
 
-    auto* provider = new QGroupBox(QStringLiteral("Provider connection"), page);
-    auto* form = new QFormLayout(provider);
-    auto* apiUrl = new QLineEdit(provider);
-    apiUrl->setObjectName(QStringLiteral("proxyProviderApiUrl"));
-    apiUrl->setPlaceholderText(QStringLiteral("https://api.provider.example/v1/proxies"));
-    auto* token = new QLineEdit(provider);
-    token->setObjectName(QStringLiteral("proxyProviderToken"));
-    token->setEchoMode(QLineEdit::Password);
-    token->setPlaceholderText(QStringLiteral("API token"));
-    auto* fetch = new QPushButton(QStringLiteral("Fetch and Test Proxies"), provider);
-    fetch->setObjectName(QStringLiteral("fetchProxies"));
-    auto* status = new QLabel(QStringLiteral("Ready to connect."), provider);
-    status->setObjectName(QStringLiteral("proxyFetcherStatus"));
-    status->setStyleSheet(QStringLiteral("color: #9CA3AF;"));
-    form->addRow(QStringLiteral("API URL"), apiUrl);
-    form->addRow(QStringLiteral("Token"), token);
-    form->addRow(fetch);
-    form->addRow(status);
-    layout->addWidget(provider);
-    layout->addStretch(1);
-    connect(fetch, &QPushButton::clicked, this, [apiUrl, status] {
-        status->setText(apiUrl->text().trimmed().isEmpty()
-                            ? QStringLiteral("Enter an API URL to fetch proxies.")
-                            : QStringLiteral("Provider is ready; fetch integration is available in Proxy Auto-Fetcher."));
-    });
+    m_fetchedProxyTable = new QTableWidget(0, 6, page);
+    m_fetchedProxyTable->setObjectName(QStringLiteral("fetchedProxyTable"));
+    m_fetchedProxyTable->setHorizontalHeaderLabels(
+        {QStringLiteral("Host"), QStringLiteral("Port"), QStringLiteral("Type"),
+         QStringLiteral("Location"), QStringLiteral("Latency"), QStringLiteral("Authentication")});
+    m_fetchedProxyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_fetchedProxyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_fetchedProxyTable->setAlternatingRowColors(true);
+    layout->addWidget(m_fetchedProxyTable, 1);
+    auto* hint = new QLabel(
+        QStringLiteral("Enter provider credentials in Proxy Pool, then fetch and test the inventory."), page);
+    hint->setStyleSheet(QStringLiteral("color: #6B7280;"));
+    layout->addWidget(hint);
     return page;
 }
 
@@ -760,6 +827,59 @@ void MainWindow::addProxyTableRow(const ProfileConfig& config)
         config.proxy.port() == 0 ? QStringLiteral("--") : QString::number(config.proxy.port())));
     m_proxyTable->setItem(row, 3, new QTableWidgetItem(type));
     m_proxyTable->setItem(row, 4, new QTableWidgetItem(config.expectedProxyIp));
+    m_proxyTable->setItem(row, 5, new QTableWidgetItem(QStringLiteral("--")));
+    m_proxyTable->setItem(row, 6, new QTableWidgetItem(QStringLiteral("--")));
+}
+
+void MainWindow::populateFetchedProxyPool(const QList<ProxyEndpoint>& proxies)
+{
+    if (m_fetchedProxyTable == nullptr) {
+        return;
+    }
+    m_fetchedProxyTable->setRowCount(0);
+    for (int row = m_proxyTable->rowCount() - 1; row >= 0; --row) {
+        QTableWidgetItem* item = m_proxyTable->item(row, 0);
+        if (item != nullptr && item->data(Qt::UserRole).toString().startsWith(QStringLiteral("provider:"))) {
+            m_proxyTable->removeRow(row);
+        }
+    }
+
+    for (const ProxyEndpoint& proxy : proxies) {
+        const QString type = proxy.type == QNetworkProxy::Socks5Proxy
+            ? QStringLiteral("SOCKS5")
+            : QStringLiteral("HTTP");
+        const QString latency = proxy.reachable
+            ? QStringLiteral("%1 ms").arg(proxy.latencyMs)
+            : QStringLiteral("Offline");
+        const int fetchedRow = m_fetchedProxyTable->rowCount();
+        m_fetchedProxyTable->insertRow(fetchedRow);
+        m_fetchedProxyTable->setItem(fetchedRow, 0, new QTableWidgetItem(proxy.host));
+        m_fetchedProxyTable->setItem(fetchedRow, 1,
+                                     new QTableWidgetItem(QString::number(proxy.port)));
+        m_fetchedProxyTable->setItem(fetchedRow, 2, new QTableWidgetItem(type));
+        m_fetchedProxyTable->setItem(fetchedRow, 3, new QTableWidgetItem(proxy.location()));
+        m_fetchedProxyTable->setItem(fetchedRow, 4, new QTableWidgetItem(latency));
+        m_fetchedProxyTable->setItem(
+            fetchedRow, 5,
+            new QTableWidgetItem(proxy.username.isEmpty() ? QStringLiteral("None")
+                                                          : QStringLiteral("Username/password")));
+
+        if (!proxy.reachable) {
+            continue;
+        }
+        const int poolRow = m_proxyTable->rowCount();
+        m_proxyTable->insertRow(poolRow);
+        auto* available = new QTableWidgetItem(QStringLiteral("Available"));
+        available->setData(Qt::UserRole, QStringLiteral("provider:%1").arg(proxy.poolKey()));
+        m_proxyTable->setItem(poolRow, 0, available);
+        m_proxyTable->setItem(poolRow, 1, new QTableWidgetItem(proxy.host));
+        m_proxyTable->setItem(poolRow, 2, new QTableWidgetItem(QString::number(proxy.port)));
+        m_proxyTable->setItem(poolRow, 3, new QTableWidgetItem(type));
+        m_proxyTable->setItem(poolRow, 4, new QTableWidgetItem(QStringLiteral("--")));
+        m_proxyTable->setItem(poolRow, 5, new QTableWidgetItem(proxy.location()));
+        m_proxyTable->setItem(poolRow, 6, new QTableWidgetItem(latency));
+    }
+    m_navigation->setCurrentRow(2);
 }
 
 void MainWindow::handleContainment(const QString& profileId, bool contained, NetworkStatus status)
