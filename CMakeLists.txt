@@ -82,7 +82,7 @@ target_link_libraries(AntiDetectBrowser PRIVATE adb_core)
 if(WIN32)
     target_include_directories(adb_core PRIVATE "${minhook_SOURCE_DIR}/include")
     target_compile_definitions(adb_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(adb_core PUBLIC minhook iphlpapi)
+    target_link_libraries(adb_core PUBLIC MinHook iphlpapi)
 endif()
 
 if(ADB_BUILD_TESTS)
