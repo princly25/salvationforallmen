@@ -27,7 +27,7 @@ jobs:
           # Qt WebEngine's CMake package requires these companion modules on
           # Windows even though the application links only WebEngineCore and
           # WebEngineWidgets directly.
-          modules: 'qtwebengine qtwebchannel qtpositioning qtdeclarative'
+          modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
 
       - name: Set up MSBuild
