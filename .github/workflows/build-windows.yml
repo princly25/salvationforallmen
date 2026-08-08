@@ -74,7 +74,6 @@ jobs:
           windeployqt.exe `
             --release `
             --compiler-runtime `
-            --webengine `
             --no-translations `
             "$buildDir/AntiDetectBrowser.exe"
           Copy-Item "$buildDir/*" $deployDir -Recurse -Force
