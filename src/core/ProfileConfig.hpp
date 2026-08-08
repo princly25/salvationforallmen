@@ -23,6 +23,6 @@ struct ProfileConfig {
     QNetworkProxy proxy{QNetworkProxy::NoProxy};
     HardwareFingerprint hardware;
     QString timezone{"UTC"};
+    int timezoneOffsetMinutes{0};
     QStringList languages{"en-US", "en"};
 };
-

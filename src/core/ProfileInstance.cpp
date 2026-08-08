@@ -2,6 +2,8 @@
 
 #include "core/CustomUrlInterceptor.hpp"
 #include "core/ProfileValidator.hpp"
+#include "crypto/ProfileSeedEngine.hpp"
+#include "hooks/FingerprintEngine.hpp"
 
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
@@ -45,6 +47,8 @@ void ProfileInstance::initializeWebEngineProfile()
     m_profile->setHttpUserAgent(m_config.userAgent);
 
     m_profile->setUrlRequestInterceptor(m_interceptor.get());
+    ProfileSeedEngine seedEngine(m_config.hardware.masterSeedHex);
+    FingerprintEngine::install(*m_profile, m_config, seedEngine);
 }
 
 void ProfileInstance::setupNetworkProxy()
@@ -56,7 +60,8 @@ void ProfileInstance::setupNetworkProxy()
 
 void ProfileInstance::injectFingerprintScripts()
 {
-    // Module 3 installs deterministic scripts before the first page is created.
+    // Scripts are installed during lazy WebEngine initialization, before the
+    // first QWebEnginePage is constructed.
 }
 
 void ProfileInstance::launch()

@@ -20,6 +20,7 @@ endif()
 find_package(Qt6 6.4 REQUIRED COMPONENTS
     Core
     Network
+    Qml
     Widgets
     WebEngineCore
     WebEngineWidgets
@@ -27,6 +28,17 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS
 find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MAXMINDDB REQUIRED IMPORTED_TARGET libmaxminddb)
+
+include(FetchContent)
+if(WIN32)
+    FetchContent_Declare(
+        minhook
+        GIT_REPOSITORY https://github.com/TsudaKageyu/minhook.git
+        GIT_TAG v1.3.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(minhook)
+endif()
 
 add_library(adb_core STATIC
     src/core/CustomUrlInterceptor.cpp
@@ -36,12 +48,15 @@ add_library(adb_core STATIC
     src/core/ProfileValidator.cpp
     src/crypto/ProfileSeedEngine.cpp
     src/geo/GeoSyncEngine.cpp
+    src/hooks/FingerprintEngine.cpp
+    src/hooks/MinHookManager.cpp
 )
 
 target_include_directories(adb_core PUBLIC src)
 target_link_libraries(adb_core PUBLIC
     Qt6::Core
     Qt6::Network
+    Qt6::Qml
     Qt6::Widgets
     Qt6::WebEngineCore
     Qt6::WebEngineWidgets
@@ -54,6 +69,7 @@ target_link_libraries(AntiDetectBrowser PRIVATE adb_core)
 
 if(WIN32)
     target_compile_definitions(adb_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(adb_core PUBLIC minhook iphlpapi)
 endif()
 
 if(ADB_BUILD_TESTS)
@@ -73,4 +89,9 @@ if(ADB_BUILD_TESTS)
     target_link_libraries(test_module2 PRIVATE adb_core Qt6::Test)
     add_test(NAME module2_seed_and_geo COMMAND test_module2)
     set_tests_properties(module2_seed_and_geo PROPERTIES TIMEOUT 30)
+
+    add_executable(test_module3 tests/test_module3.cpp)
+    target_link_libraries(test_module3 PRIVATE adb_core Qt6::Test)
+    add_test(NAME module3_fingerprint_injection COMMAND test_module3)
+    set_tests_properties(module3_fingerprint_injection PROPERTIES TIMEOUT 30)
 endif()

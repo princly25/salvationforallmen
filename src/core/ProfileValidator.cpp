@@ -46,6 +46,9 @@ ValidationResult ProfileValidator::validateProfile(const ProfileConfig& config)
     if (config.timezone.trimmed().isEmpty()) {
         reject(QStringLiteral("ERROR: Timezone cannot be empty."));
     }
+    if (config.timezoneOffsetMinutes < -840 || config.timezoneOffsetMinutes > 840) {
+        reject(QStringLiteral("ERROR: Timezone offset is outside the supported range."));
+    }
     if (config.proxy.type() != QNetworkProxy::NoProxy
         && (config.proxy.hostName().trimmed().isEmpty() || config.proxy.port() == 0)) {
         reject(QStringLiteral("ERROR: Proxy host and port are required when proxying is enabled."));
@@ -53,4 +56,3 @@ ValidationResult ProfileValidator::validateProfile(const ProfileConfig& config)
 
     return result;
 }
-
