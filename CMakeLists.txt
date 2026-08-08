@@ -24,6 +24,9 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS
     WebEngineCore
     WebEngineWidgets
 )
+find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MAXMINDDB REQUIRED IMPORTED_TARGET libmaxminddb)
 
 add_library(adb_core STATIC
     src/core/CustomUrlInterceptor.cpp
@@ -31,6 +34,8 @@ add_library(adb_core STATIC
     src/core/ProfileManager.cpp
     src/core/ProfileSandbox.cpp
     src/core/ProfileValidator.cpp
+    src/crypto/ProfileSeedEngine.cpp
+    src/geo/GeoSyncEngine.cpp
 )
 
 target_include_directories(adb_core PUBLIC src)
@@ -40,6 +45,8 @@ target_link_libraries(adb_core PUBLIC
     Qt6::Widgets
     Qt6::WebEngineCore
     Qt6::WebEngineWidgets
+    OpenSSL::Crypto
+    PkgConfig::MAXMINDDB
 )
 
 add_executable(AntiDetectBrowser WIN32 src/main.cpp)
@@ -61,4 +68,9 @@ if(ADB_BUILD_TESTS)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox --disable-gpu --single-process --no-zygote;QTWEBENGINE_DISABLE_SANDBOX=1"
         TIMEOUT 30
     )
+
+    add_executable(test_module2 tests/test_module2.cpp)
+    target_link_libraries(test_module2 PRIVATE adb_core Qt6::Test)
+    add_test(NAME module2_seed_and_geo COMMAND test_module2)
+    set_tests_properties(module2_seed_and_geo PROPERTIES TIMEOUT 30)
 endif()
