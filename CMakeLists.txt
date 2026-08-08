@@ -26,8 +26,14 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS
     WebEngineWidgets
 )
 find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(MAXMINDDB REQUIRED IMPORTED_TARGET libmaxminddb)
+if(WIN32)
+    find_package(maxminddb CONFIG REQUIRED)
+    set(ADB_MAXMINDDB_TARGET maxminddb::maxminddb)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MAXMINDDB REQUIRED IMPORTED_TARGET libmaxminddb)
+    set(ADB_MAXMINDDB_TARGET PkgConfig::MAXMINDDB)
+endif()
 
 include(FetchContent)
 if(WIN32)
@@ -67,7 +73,7 @@ target_link_libraries(adb_core PUBLIC
     Qt6::WebEngineCore
     Qt6::WebEngineWidgets
     OpenSSL::Crypto
-    PkgConfig::MAXMINDDB
+    ${ADB_MAXMINDDB_TARGET}
 )
 
 add_executable(AntiDetectBrowser WIN32 src/main.cpp)

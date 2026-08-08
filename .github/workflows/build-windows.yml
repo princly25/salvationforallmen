@@ -1,0 +1,83 @@
+name: Build Windows Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build salvationforallmen (MSVC Release)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: 'qtwebengine'
+          cache: true
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+          vcpkgGitCommitId: 'ea1a7396b05637a53bf23c078647ecc0edee4b80'
+
+      - name: Install native dependencies
+        shell: pwsh
+        run: |
+          vcpkg install openssl libmaxminddb --triplet x64-windows
+
+      - name: Configure Release build
+        shell: pwsh
+        run: |
+          cmake -S . -B build-windows `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DADB_BUILD_TESTS=OFF `
+            -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build Release
+        shell: pwsh
+        run: cmake --build build-windows --config Release --parallel
+
+      - name: Bundle Qt runtime dependencies
+        shell: pwsh
+        run: |
+          $buildDir = "$env:GITHUB_WORKSPACE/build-windows/Release"
+          $deployDir = "$env:GITHUB_WORKSPACE/package"
+          New-Item -ItemType Directory -Force -Path $deployDir | Out-Null
+          windeployqt.exe `
+            --release `
+            --compiler-runtime `
+            --webengine `
+            --no-translations `
+            "$buildDir/AntiDetectBrowser.exe"
+          Copy-Item "$buildDir/*" $deployDir -Recurse -Force
+          if (Test-Path config) { Copy-Item config $deployDir -Recurse }
+          if (Test-Path data) { Copy-Item data $deployDir -Recurse }
+          Copy-Item "$env:GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin/libcrypto-*.dll" $deployDir -ErrorAction SilentlyContinue
+          Copy-Item "$env:GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin/maxminddb.dll" $deployDir -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$deployDir/*" -DestinationPath "$env:GITHUB_WORKSPACE/AntiDetectBrowser-Windows.zip" -CompressionLevel Optimal
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: AntiDetectBrowser-Windows.zip
+          path: AntiDetectBrowser-Windows.zip
+          if-no-files-found: error
+          compression-level: 9
