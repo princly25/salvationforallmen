@@ -7,6 +7,11 @@
     "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
     "name": { "type": "string", "minLength": 1 },
     "userAgent": { "type": "string", "minLength": 1 },
+    "proxyVerificationUrl": { "type": "string", "format": "uri" },
+    "expectedProxyIp": {
+      "type": "string",
+      "oneOf": [{ "format": "ipv4" }, { "format": "ipv6" }]
+    },
     "hardware": {
       "type": "object",
       "required": ["cpuCores", "memoryGb", "screenWidth", "screenHeight", "masterSeedHex"],
@@ -20,4 +25,3 @@
     }
   }
 }
-

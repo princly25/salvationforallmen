@@ -3,6 +3,7 @@
 #include <QNetworkProxy>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 
 #include <string>
 
@@ -21,6 +22,8 @@ struct ProfileConfig {
     QString name;
     QString userAgent;
     QNetworkProxy proxy{QNetworkProxy::NoProxy};
+    QUrl proxyVerificationUrl;
+    QString expectedProxyIp;
     HardwareFingerprint hardware;
     QString timezone{"UTC"};
     int timezoneOffsetMinutes{0};

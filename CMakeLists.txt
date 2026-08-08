@@ -50,6 +50,8 @@ add_library(adb_core STATIC
     src/geo/GeoSyncEngine.cpp
     src/hooks/FingerprintEngine.cpp
     src/hooks/MinHookManager.cpp
+    src/network/NetworkMonitor.cpp
+    src/network/KillSwitchEngine.cpp
 )
 
 target_include_directories(adb_core PUBLIC src)
@@ -94,4 +96,9 @@ if(ADB_BUILD_TESTS)
     target_link_libraries(test_module3 PRIVATE adb_core Qt6::Test)
     add_test(NAME module3_fingerprint_injection COMMAND test_module3)
     set_tests_properties(module3_fingerprint_injection PROPERTIES TIMEOUT 30)
+
+    add_executable(test_module4 tests/test_module4.cpp)
+    target_link_libraries(test_module4 PRIVATE adb_core Qt6::Test)
+    add_test(NAME module4_network_kill_switch COMMAND test_module4)
+    set_tests_properties(module4_network_kill_switch PROPERTIES TIMEOUT 30)
 endif()
