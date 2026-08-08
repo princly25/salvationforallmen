@@ -247,7 +247,7 @@ QWidget* MainWindow::buildProxyPage()
     auto* geoLayout = new QFormLayout(geoGroup);
     m_geoDatabasePath = new QLineEdit(geoGroup);
     m_geoDatabasePath->setObjectName(QStringLiteral("geoDatabasePath"));
-    m_geoDatabasePath->setPlaceholderText(QStringLiteral("data/GeoLite2-City.mmdb"));
+    m_geoDatabasePath->setText(QStringLiteral("data/GeoLite2-City.mmdb"));
     m_geoIpAddress = new QLineEdit(geoGroup);
     m_geoIpAddress->setObjectName(QStringLiteral("geoIpAddress"));
     m_geoIpAddress->setPlaceholderText(QStringLiteral("Proxy exit IP"));
@@ -439,7 +439,7 @@ ProfileInstance& MainWindow::addProfile(const ProfileConfig& config)
                 }
             });
     m_killSwitches.emplace(config.id, std::move(engine));
-    addProxyTableRow(config);
+    addProxyTableRow(profile.config());
     addLogMessage(QStringLiteral("[%1] Profile added and sandbox prepared.").arg(config.id));
     return profile;
 }
@@ -590,6 +590,7 @@ void MainWindow::showCreateProfileDialog()
         config.id = id->text().trimmed();
         config.name = name->text().trimmed();
         config.userAgent = userAgent->text().trimmed();
+        config.geoDatabasePath = m_geoDatabasePath->text().trimmed();
         config.timezone = timezone->text().trimmed();
         config.timezoneOffsetMinutes = timezoneOffset->value();
         config.languages.clear();
@@ -827,7 +828,13 @@ void MainWindow::addProxyTableRow(const ProfileConfig& config)
         config.proxy.port() == 0 ? QStringLiteral("--") : QString::number(config.proxy.port())));
     m_proxyTable->setItem(row, 3, new QTableWidgetItem(type));
     m_proxyTable->setItem(row, 4, new QTableWidgetItem(config.expectedProxyIp));
-    m_proxyTable->setItem(row, 5, new QTableWidgetItem(QStringLiteral("--")));
+    QString location = config.countryCode;
+    if (!config.timezone.isEmpty()) {
+        location = location.isEmpty() ? config.timezone
+                                      : QStringLiteral("%1 · %2").arg(location, config.timezone);
+    }
+    m_proxyTable->setItem(row, 5, new QTableWidgetItem(
+        location.isEmpty() ? QStringLiteral("--") : location));
     m_proxyTable->setItem(row, 6, new QTableWidgetItem(QStringLiteral("--")));
 }
 

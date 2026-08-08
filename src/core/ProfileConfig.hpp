@@ -24,7 +24,9 @@ struct ProfileConfig {
     QNetworkProxy proxy{QNetworkProxy::NoProxy};
     QUrl proxyVerificationUrl;
     QString expectedProxyIp;
+    QString geoDatabasePath{QStringLiteral("data/GeoLite2-City.mmdb")};
     HardwareFingerprint hardware;
+    QString countryCode;
     QString timezone{"UTC"};
     int timezoneOffsetMinutes{0};
     QStringList languages{"en-US", "en"};

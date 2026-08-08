@@ -176,18 +176,18 @@ QString FingerprintEngine::generateInjectionScript(const ProfileConfig& config,
   }
   if (globalThis.Intl && Intl.DateTimeFormat) {
     const OriginalDateTimeFormat = Intl.DateTimeFormat;
-    Intl.DateTimeFormat = function(locales, options) {
-      const formatter = new OriginalDateTimeFormat(locales, options);
-      const originalResolvedOptions = formatter.resolvedOptions.bind(formatter);
-      formatter.resolvedOptions = function() {
-        return Object.assign({}, originalResolvedOptions(), { timeZone: __TIMEZONE__ });
-      };
-      return formatter;
+    const geoTimeZone = __TIMEZONE__;
+    const GeoDateTimeFormat = function(locales, options) {
+      const synchronizedOptions = Object.assign({}, options || {}, { timeZone: geoTimeZone });
+      return new OriginalDateTimeFormat(locales, synchronizedOptions);
     };
-    Intl.DateTimeFormat.prototype = OriginalDateTimeFormat.prototype;
+    Object.defineProperty(GeoDateTimeFormat, 'name', { value: 'DateTimeFormat' });
+    Object.defineProperty(GeoDateTimeFormat, 'length', { value: 0 });
+    GeoDateTimeFormat.prototype = OriginalDateTimeFormat.prototype;
     if (typeof OriginalDateTimeFormat.supportedLocalesOf === 'function') {
-      Intl.DateTimeFormat.supportedLocalesOf = OriginalDateTimeFormat.supportedLocalesOf.bind(OriginalDateTimeFormat);
+      GeoDateTimeFormat.supportedLocalesOf = OriginalDateTimeFormat.supportedLocalesOf.bind(OriginalDateTimeFormat);
     }
+    Intl.DateTimeFormat = GeoDateTimeFormat;
   }
 })();
 )JS");

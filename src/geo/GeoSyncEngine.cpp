@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QHash>
+#include <QLocale>
 #include <QTimeZone>
 
 #include <cstring>
@@ -74,7 +75,27 @@ QStringList GeoSyncEngine::languagesForCountry(const QString& countryCode)
         {QStringLiteral("CN"), {QStringLiteral("zh-CN"), QStringLiteral("zh"), QStringLiteral("en")}},
         {QStringLiteral("IN"), {QStringLiteral("en-IN"), QStringLiteral("hi-IN"), QStringLiteral("en")}},
     };
-    return languages.value(countryCode.toUpper(), {QStringLiteral("en-US"), QStringLiteral("en")});
+    const QString normalizedCountry = countryCode.toUpper();
+    if (const auto known = languages.constFind(normalizedCountry); known != languages.cend()) {
+        return known.value();
+    }
+
+    const QLocale::Territory territory = QLocale::codeToTerritory(normalizedCountry);
+    if (territory != QLocale::AnyTerritory) {
+        const QList<QLocale> locales =
+            QLocale::matchingLocales(QLocale::AnyLanguage, QLocale::AnyScript, territory);
+        for (const QLocale& locale : locales) {
+            if (locale.language() == QLocale::C) {
+                continue;
+            }
+            const QString regionalLanguage = locale.bcp47Name();
+            const QString baseLanguage = QLocale::languageToCode(locale.language());
+            if (!regionalLanguage.isEmpty() && !baseLanguage.isEmpty()) {
+                return {regionalLanguage, baseLanguage};
+            }
+        }
+    }
+    return {QStringLiteral("en-US"), QStringLiteral("en")};
 }
 
 std::optional<GeoLocationData> GeoSyncEngine::resolveProxyIp(const QString& ipAddress)
@@ -109,6 +130,10 @@ std::optional<GeoLocationData> GeoSyncEngine::resolveProxyIp(const QString& ipAd
 
     GeoLocationData location;
     location.countryCode = readUtf8(lookup.entry, "country", "iso_code").toUpper();
+    if (location.countryCode.isEmpty()) {
+        location.countryCode =
+            readUtf8(lookup.entry, "registered_country", "iso_code").toUpper();
+    }
     location.timezone = readUtf8(lookup.entry, "location", "time_zone");
     location.latitude = readDouble(lookup.entry, "location", "latitude").value_or(0.0);
     location.longitude = readDouble(lookup.entry, "location", "longitude").value_or(0.0);

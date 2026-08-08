@@ -323,6 +323,22 @@ QString pageText(QWebEnginePage* page)
     }
     return text;
 }
+
+QVariant runJavaScript(QWebEnginePage* page, const QString& script)
+{
+    QVariant result;
+    bool complete = false;
+    page->runJavaScript(script, [&](const QVariant& value) {
+        result = value;
+        complete = true;
+    });
+    QElapsedTimer timer;
+    timer.start();
+    while (!complete && timer.elapsed() < 3000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+    return complete ? result : QVariant{};
+}
 }
 
 class LiveRigorousTest final : public QObject {
@@ -334,6 +350,7 @@ private slots:
     void simulatedRealHttpProxyHandshake();
     void dynamicKillSwitchFailsClosedWithoutNativeFallback();
     void webRtcAndSocks5DnsLeakAudit();
+    void proxyTimezoneAndLocaleReachBrowserRuntime();
 };
 
 void LiveRigorousTest::cleanup()
@@ -493,6 +510,51 @@ void LiveRigorousTest::webRtcAndSocks5DnsLeakAudit()
     const QString response = pageText(profile.view()->page());
     QVERIFY(response.contains(config.expectedProxyIp));
     QVERIFY(response.contains(QStringLiteral("resolved-by-socks5")));
+}
+
+void LiveRigorousTest::proxyTimezoneAndLocaleReachBrowserRuntime()
+{
+    MockHttpProxy proxy;
+    QVERIFY(proxy.listen());
+    const QNetworkProxy proxyConfig(QNetworkProxy::HttpProxy,
+                                    QStringLiteral("127.0.0.1"), proxy.port());
+    QNetworkProxy::setApplicationProxy(proxyConfig);
+
+    QTemporaryDir storageRoot;
+    ProfileConfig config = liveConfig(QStringLiteral("proxy-geo-runtime"),
+                                      std::string(64, '6'), proxyConfig);
+    config.countryCode = QStringLiteral("DE");
+    config.timezone = QStringLiteral("Europe/Berlin");
+    config.timezoneOffsetMinutes = 120;
+    config.languages = {QStringLiteral("de-DE"), QStringLiteral("de")};
+    ProfileInstance profile(config, storageRoot.path());
+    profile.launch();
+
+    QSignalSpy loadSpy(profile.view()->page(), &QWebEnginePage::loadFinished);
+    profile.view()->page()->setHtml(QStringLiteral("<!doctype html><title>geo-sync</title>"));
+    QVERIFY(loadSpy.wait(8000));
+    QCOMPARE(profile.webEngineProfile()->httpAcceptLanguage(), QStringLiteral("de-DE,de"));
+    QVERIFY(profile.view()->page()->settings()->testAttribute(
+        QWebEngineSettings::WebRTCPublicInterfacesOnly));
+
+    const QVariant runtime = runJavaScript(profile.view()->page(), QStringLiteral(R"JS([
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      navigator.language,
+      navigator.languages.join(','),
+      new Date(0).getTimezoneOffset(),
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC', hour: '2-digit', hourCycle: 'h23'
+      }).formatToParts(new Date(Date.UTC(2020, 7, 1, 0, 0, 0)))
+        .find((part) => part.type === 'hour').value
+    ])JS"));
+    QVERIFY(runtime.isValid());
+    const QVariantList values = runtime.toList();
+    QCOMPARE(values.size(), 5);
+    QCOMPARE(values.at(0).toString(), config.timezone);
+    QCOMPARE(values.at(1).toString(), QStringLiteral("de-DE"));
+    QCOMPARE(values.at(2).toString(), QStringLiteral("de-DE,de"));
+    QCOMPARE(values.at(3).toInt(), -config.timezoneOffsetMinutes);
+    QCOMPARE(values.at(4).toString(), QStringLiteral("02"));
 }
 
 int main(int argc, char* argv[])

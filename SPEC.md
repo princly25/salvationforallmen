@@ -563,3 +563,9 @@ Feed these commands to Codex CLI sequentially:
 
 6. **Phase 6 (Unified Build & Release Validation)**:
 > Finalize the CMake build for headless Linux validation and Windows desktop deployment, then run the complete unit and mock-browser validation suite.
+
+### Module 2.2 Extension: Proxy Network Geo-Synchronization Engine
+- **GeoIP Localization:** When a profile connects through a proxy, parse the proxy exit node's country and timezone.
+- **Runtime JS Overrides:** Dynamically inject runtime JavaScript overrides for `Intl.DateTimeFormat`, `Date.prototype.getTimezoneOffset`, `navigator.language`, and `navigator.languages` to maintain network-to-browser environmental consistency.
+- **Header Synchronization:** Automatically set the `QWebEngineProfile` `Accept-Language` header to align with the proxy's regional language code.
+- **WebRTC Enforcement:** Configure `QWebEngineSettings::WebRTCPublicInterfacesOnly` to ensure WebRTC candidate gathering is restricted strictly to proxied interfaces.

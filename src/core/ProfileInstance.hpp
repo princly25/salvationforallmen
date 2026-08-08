@@ -10,6 +10,7 @@
 class CustomUrlInterceptor;
 class QWebEnginePage;
 class QWebEngineProfile;
+class QWebEngineSettings;
 class QWebEngineView;
 
 class ProfileInstance final : public QObject {
@@ -39,10 +40,12 @@ signals:
     void stateChanged(ProfileInstance::State state);
 
 private:
+    void synchronizeProxyGeoLocation();
     void setupStoragePaths();
     void initializeWebEngineProfile();
     void setupNetworkProxy();
     void injectFingerprintScripts();
+    static void enforceWebRtcPolicy(QWebEngineSettings& settings);
 
     ProfileConfig m_config;
     QString m_storageRoot;

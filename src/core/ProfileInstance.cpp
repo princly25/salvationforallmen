@@ -3,8 +3,14 @@
 #include "core/CustomUrlInterceptor.hpp"
 #include "core/ProfileValidator.hpp"
 #include "crypto/ProfileSeedEngine.hpp"
+#include "geo/GeoSyncEngine.hpp"
 #include "hooks/FingerprintEngine.hpp"
 
+#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QHostAddress>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
@@ -17,7 +23,9 @@ ProfileInstance::ProfileInstance(const ProfileConfig& config, const QString& sto
     , m_config(config)
     , m_storageRoot(storageRoot)
 {
-    const ValidationResult validation = ProfileValidator::validateProfile(config);
+    synchronizeProxyGeoLocation();
+
+    const ValidationResult validation = ProfileValidator::validateProfile(m_config);
     if (!validation.isValid) {
         throw std::invalid_argument(validation.discrepancies.join(QStringLiteral(" ")).toStdString());
     }
@@ -35,6 +43,69 @@ void ProfileInstance::setupStoragePaths()
     m_paths = ProfileSandbox::prepare(m_config.id, m_storageRoot);
 }
 
+void ProfileInstance::synchronizeProxyGeoLocation()
+{
+    if (m_config.proxy.type() == QNetworkProxy::NoProxy) {
+        return;
+    }
+
+    const QString exitIp = m_config.expectedProxyIp.trimmed().isEmpty()
+        ? m_config.proxy.hostName().trimmed()
+        : m_config.expectedProxyIp.trimmed();
+    QHostAddress exitAddress;
+    if (!exitAddress.setAddress(exitIp)) {
+        return;
+    }
+
+    const QString configuredPath = m_config.geoDatabasePath.trimmed();
+    if (configuredPath.isEmpty()) {
+        return;
+    }
+
+    QString databasePath = configuredPath;
+    const QFileInfo configuredInfo(configuredPath);
+    if (configuredInfo.isRelative()) {
+        const QStringList candidates{
+            QDir::current().absoluteFilePath(configuredPath),
+            QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(configuredPath),
+            QDir(QCoreApplication::applicationDirPath()).absoluteFilePath(
+                QStringLiteral("../") + configuredPath),
+        };
+        for (const QString& candidate : candidates) {
+            if (QFileInfo::exists(candidate)) {
+                databasePath = candidate;
+                break;
+            }
+        }
+    }
+    if (!QFileInfo::exists(databasePath)) {
+        return;
+    }
+
+    const QByteArray encodedPath = QFile::encodeName(databasePath);
+    GeoSyncEngine geoSync(std::string(encodedPath.constData(), encodedPath.size()));
+    const std::optional<GeoLocationData> location = geoSync.resolveProxyIp(exitAddress.toString());
+    if (!location.has_value()) {
+        return;
+    }
+
+    if (!location->countryCode.isEmpty()) {
+        m_config.countryCode = location->countryCode;
+    }
+    if (!location->timezone.isEmpty()) {
+        m_config.timezone = location->timezone;
+        m_config.timezoneOffsetMinutes = location->timezoneOffsetMinutes;
+    }
+    if (!location->languages.isEmpty()) {
+        m_config.languages = location->languages;
+    }
+}
+
+void ProfileInstance::enforceWebRtcPolicy(QWebEngineSettings& settings)
+{
+    settings.setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
+}
+
 void ProfileInstance::initializeWebEngineProfile()
 {
     if (m_profile) {
@@ -46,7 +117,7 @@ void ProfileInstance::initializeWebEngineProfile()
     m_profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
     m_profile->setHttpUserAgent(m_config.userAgent);
     m_profile->setHttpAcceptLanguage(m_config.languages.join(QStringLiteral(",")));
-    m_profile->settings()->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
+    enforceWebRtcPolicy(*m_profile->settings());
     m_profile->settings()->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, false);
 
     m_profile->setUrlRequestInterceptor(m_interceptor.get());
@@ -75,6 +146,7 @@ void ProfileInstance::launch()
     if (!m_page) {
         initializeWebEngineProfile();
         m_page = std::make_unique<QWebEnginePage>(m_profile.get());
+        enforceWebRtcPolicy(*m_page->settings());
         m_view = std::make_unique<QWebEngineView>();
         m_view->setPage(m_page.get());
     }

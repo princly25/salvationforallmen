@@ -3,6 +3,7 @@
 #include "core/ProfileSandbox.hpp"
 
 #include <QRegularExpression>
+#include <QTimeZone>
 
 ValidationResult ProfileValidator::validateProfile(const ProfileConfig& config)
 {
@@ -43,8 +44,15 @@ ValidationResult ProfileValidator::validateProfile(const ProfileConfig& config)
     if (config.languages.isEmpty()) {
         reject(QStringLiteral("ERROR: At least one navigator language is required."));
     }
-    if (config.timezone.trimmed().isEmpty()) {
-        reject(QStringLiteral("ERROR: Timezone cannot be empty."));
+    if (!config.countryCode.isEmpty()) {
+        static const QRegularExpression countryPattern(QStringLiteral("^[A-Za-z]{2}$"));
+        if (!countryPattern.match(config.countryCode).hasMatch()) {
+            reject(QStringLiteral("ERROR: Country code must contain exactly two letters."));
+        }
+    }
+    const QTimeZone timezone(config.timezone.trimmed().toUtf8());
+    if (!timezone.isValid()) {
+        reject(QStringLiteral("ERROR: Timezone must be a valid IANA timezone identifier."));
     }
     if (config.timezoneOffsetMinutes < -840 || config.timezoneOffsetMinutes > 840) {
         reject(QStringLiteral("ERROR: Timezone offset is outside the supported range."));
