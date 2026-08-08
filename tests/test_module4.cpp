@@ -41,9 +41,12 @@ void Module4Test::monitorDetectsProxyLossAndRecovery()
                                          QStringLiteral("127.0.0.1"), port));
     QSignalSpy emergencySpy(&monitor, &NetworkMonitor::networkEmergencyTriggered);
     QSignalSpy restoredSpy(&monitor, &NetworkMonitor::networkRestored);
+    QSignalSpy heartbeatSpy(&monitor, &NetworkMonitor::heartbeatSucceeded);
 
     monitor.startMonitoring(10);
     QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(heartbeatSpy.count() > 0, 2000);
+    QVERIFY(heartbeatSpy.constFirst().constFirst().toInt() >= 0);
     QCOMPARE(monitor.status(), NetworkStatus::Healthy);
     server.close();
     QTRY_VERIFY_WITH_TIMEOUT(emergencySpy.count() > 0, 3000);

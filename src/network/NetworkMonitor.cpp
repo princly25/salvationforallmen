@@ -96,6 +96,7 @@ void NetworkMonitor::checkProxyHeartbeat()
     }
 
     m_attemptInFlight = true;
+    m_attemptTimer.start();
     m_socket.abort();
     m_socket.connectToHost(m_proxy.hostName(), m_proxy.port());
     m_attemptTimeout.start(std::max(100, m_heartbeatIntervalMs * 3));
@@ -106,7 +107,9 @@ void NetworkMonitor::onSocketConnected()
     if (!m_attemptInFlight) {
         return;
     }
+    const int latencyMs = static_cast<int>(m_attemptTimer.elapsed());
     recordSuccess();
+    emit heartbeatSucceeded(latencyMs);
     abortAttempt();
 }
 

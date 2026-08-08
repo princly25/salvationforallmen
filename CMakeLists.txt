@@ -52,6 +52,8 @@ add_library(adb_core STATIC
     src/hooks/MinHookManager.cpp
     src/network/NetworkMonitor.cpp
     src/network/KillSwitchEngine.cpp
+    src/ui/MainWindow.cpp
+    src/ui/ProfileCardWidget.cpp
 )
 
 target_include_directories(adb_core PUBLIC src)
@@ -101,6 +103,14 @@ if(ADB_BUILD_TESTS)
     target_link_libraries(test_module4 PRIVATE adb_core Qt6::Test)
     add_test(NAME module4_network_kill_switch COMMAND test_module4)
     set_tests_properties(module4_network_kill_switch PROPERTIES TIMEOUT 30)
+
+    add_executable(test_module6 tests/test_module6.cpp)
+    target_link_libraries(test_module6 PRIVATE adb_core Qt6::Test)
+    add_test(NAME module6_dashboard_ui COMMAND test_module6)
+    set_tests_properties(module6_dashboard_ui PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox --disable-gpu --single-process --no-zygote;QTWEBENGINE_DISABLE_SANDBOX=1"
+        TIMEOUT 30
+    )
 
     add_executable(test_live_rigorous tests/test_live_rigorous.cpp)
     target_link_libraries(test_live_rigorous PRIVATE adb_core Qt6::Test)

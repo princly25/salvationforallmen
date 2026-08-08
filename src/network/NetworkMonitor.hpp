@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QNetworkInformation>
 #include <QNetworkProxy>
 #include <QObject>
@@ -34,6 +35,7 @@ public:
 signals:
     void networkEmergencyTriggered(NetworkStatus status);
     void networkRestored();
+    void heartbeatSucceeded(int latencyMs);
 
 private slots:
     void checkProxyHeartbeat();
@@ -49,6 +51,7 @@ private:
     bool proxyIsUsable() const noexcept;
 
     QNetworkProxy m_proxy;
+    QElapsedTimer m_attemptTimer;
     QTimer m_heartbeatTimer;
     QTimer m_attemptTimeout;
     QTcpSocket m_socket;
